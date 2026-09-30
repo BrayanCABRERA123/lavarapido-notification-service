@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,6 +34,20 @@ class NotificationFactoryTest {
         assertEquals(12, commands.getFirst().userId());
         assertEquals(NotificationTypeCode.USER_WELCOME, commands.getFirst().type());
         assertNull(commands.getFirst().referenceEntity());
+    }
+
+    @Test
+    @DisplayName("la bienvenida lleva el correo y el nombre del evento; un correo inválido se descarta")
+    void welcomeCarriesEmail() {
+        SendNotificationCommand command = factory.from(event("UserRegistered",
+                Map.of("userId", 12, "email", "ana@gmail.com", "firstName", "Ana"))).getFirst();
+        assertEquals("ana@gmail.com", command.email());
+        assertEquals("Ana", command.recipientName());
+        assertTrue(command.hasEmail());
+
+        SendNotificationCommand invalid = factory.from(event("UserRegistered",
+                Map.of("userId", 12, "email", "no es un correo"))).getFirst();
+        assertFalse(invalid.hasEmail());
     }
 
     @Test

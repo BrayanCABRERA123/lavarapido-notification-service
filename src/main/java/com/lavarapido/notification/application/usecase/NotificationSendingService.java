@@ -5,6 +5,7 @@ import com.lavarapido.notification.domain.model.Notification;
 import com.lavarapido.notification.domain.port.in.SendNotificationCommand;
 import com.lavarapido.notification.domain.port.in.SendNotificationUseCase;
 import com.lavarapido.notification.domain.port.out.DeviceTokenRepository;
+import com.lavarapido.notification.domain.port.out.EmailSender;
 import com.lavarapido.notification.domain.port.out.NotificationRepository;
 import com.lavarapido.notification.domain.port.out.PushSender;
 import org.slf4j.Logger;
@@ -16,9 +17,9 @@ import java.time.Clock;
 import java.util.List;
 
 /**
- * Guarda la notificación en la bandeja y la manda por push a los celulares del usuario.
- * El push es un extra: si falla o el usuario no tiene celular registrado, la notificación igual
- * queda guardada y la ve en la campanita.
+ * Guarda la notificación en la bandeja, la manda por push a los celulares del usuario y, si el
+ * comando trae correo, también por email. Push y correo son extras: si fallan o no aplican, la
+ * notificación igual queda guardada y la ve en la campanita.
  */
 @Service
 public class NotificationSendingService implements SendNotificationUseCase {
@@ -28,13 +29,15 @@ public class NotificationSendingService implements SendNotificationUseCase {
     private final NotificationRepository notifications;
     private final DeviceTokenRepository devices;
     private final PushSender pushSender;
+    private final EmailSender emailSender;
     private final Clock clock;
 
     public NotificationSendingService(NotificationRepository notifications, DeviceTokenRepository devices,
-                                      PushSender pushSender, Clock clock) {
+                                      PushSender pushSender, EmailSender emailSender, Clock clock) {
         this.notifications = notifications;
         this.devices = devices;
         this.pushSender = pushSender;
+        this.emailSender = emailSender;
         this.clock = clock;
     }
 
@@ -48,6 +51,9 @@ public class NotificationSendingService implements SendNotificationUseCase {
         List<DeviceToken> targets = devices.findActiveByUser(saved.userId());
         if (!targets.isEmpty()) {
             pushSender.send(saved, targets);
+        }
+        if (command.hasEmail()) {
+            emailSender.send(saved, command.email().strip(), command.recipientName());
         }
         log.info("Notification {} ({}) created for user {}, push to {} device(s)",
                 saved.notificationId(), saved.type(), saved.userId(), targets.size());

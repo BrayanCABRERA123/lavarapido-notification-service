@@ -1,7 +1,7 @@
 # lavarapido-notification-service
 
 Notificaciones de LavaRápido (RF-018): bandeja con leídas/no leídas, notificaciones push al
-celular y mensajes del administrador. Recibe los eventos de los demás servicios por RabbitMQ.
+celular, correo de bienvenida y mensajes del administrador. Recibe los eventos de los demás servicios por RabbitMQ.
 
 | | |
 |---|---|
@@ -18,7 +18,7 @@ Requisitos: SQL Server del `lavarapido-infra` encendido y el `.env` de esa carpe
 
 ```bash
 ./mvnw spring-boot:run        # Windows: .\mvnw.cmd spring-boot:run
-./mvnw clean test             # pruebas (42)
+./mvnw clean test             # pruebas (45)
 ```
 
 Swagger (perfil dev): http://localhost:3006/swagger-ui.html — haz login en el security-service
@@ -30,6 +30,7 @@ Swagger (perfil dev): http://localhost:3006/swagger-ui.html — haz login en el 
 |---|---|---|
 | `MESSAGING_ENABLED` | `false` | `true`: escucha los eventos de RabbitMQ (`docker compose up -d` lo levanta) |
 | `PUSH_ENABLED` | `false` | `true`: envía las push con Expo. `false`: solo las escribe en el log |
+| `MAIL_ENABLED` | `false` | `true`: envía el correo de bienvenida con la configuración `MAIL_*` (la misma del security-service: Gmail o Mailpit) |
 | `EXPO_ACCESS_TOKEN` | vacío | Solo si en expo.dev se activa "Enhanced security for push" |
 
 Con todo en `false` el servicio funciona igual: guarda las notificaciones y se ven en la bandeja.

@@ -36,10 +36,17 @@ public final class EventNotificationFactory {
         List<SendNotificationCommand> commands = new ArrayList<>();
 
         switch (event.eventType() == null ? "" : event.eventType()) {
-            case "UserRegistered" -> add(commands, userId(p, "userId"), NotificationTypeCode.USER_WELCOME,
-                    "¡Bienvenido a LavaRápido!",
-                    "Tu cuenta quedó creada. Ya puedes registrar tus vehículos y reservar tu primer lavado.",
-                    null, null);
+            case "UserRegistered" -> {
+                // la bienvenida también va por correo: el evento trae el correo (ADR-011)
+                Long user = userId(p, "userId");
+                if (user != null) {
+                    String name = text(p, "firstName");
+                    commands.add(new SendNotificationCommand(user, NotificationTypeCode.USER_WELCOME,
+                            name == null ? "¡Bienvenido a LavaRápido!" : "¡Bienvenido a LavaRápido, " + name + "!",
+                            "Tu cuenta quedó creada. Ya puedes registrar tus vehículos y reservar tu primer lavado.",
+                            null, null, email(p), name));
+                }
+            }
             case "BookingCreated" -> add(commands, userId(p, "customerUserId"), NotificationTypeCode.BOOKING_CREATED,
                     "Reserva registrada",
                     "Recibimos tu reserva" + bookingCode(p) + " para el " + when(p) + ". Te avisaremos cuando quede confirmada.",
@@ -117,6 +124,17 @@ public final class EventNotificationFactory {
             return Long.parseLong(text);
         }
         return null;
+    }
+
+    private static String text(Map<String, Object> payload, String key) {
+        Object value = payload.get(key);
+        return value instanceof String text && !text.isBlank() ? text.strip() : null;
+    }
+
+    // solo un correo con forma válida; si no, la bienvenida va sin email
+    private static String email(Map<String, Object> payload) {
+        String value = text(payload, "email");
+        return value != null && value.length() <= 254 && value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$") ? value : null;
     }
 
     private static String bookingCode(Map<String, Object> payload) {

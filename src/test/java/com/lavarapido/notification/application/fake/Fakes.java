@@ -5,6 +5,7 @@ import com.lavarapido.notification.domain.model.Notification;
 import com.lavarapido.notification.domain.model.NotificationFilter;
 import com.lavarapido.notification.domain.model.PageResult;
 import com.lavarapido.notification.domain.port.out.DeviceTokenRepository;
+import com.lavarapido.notification.domain.port.out.EmailSender;
 import com.lavarapido.notification.domain.port.out.NotificationRepository;
 import com.lavarapido.notification.domain.port.out.ProcessedEventRepository;
 import com.lavarapido.notification.domain.port.out.PushSender;
@@ -142,6 +143,17 @@ public final class Fakes {
         @Override
         public void record(String eventId, String eventType) {
             ids.add(eventId);
+        }
+    }
+
+    /** Guarda a qué correos se habría enviado cada notificación. */
+    public static final class RecordingEmailSender implements EmailSender {
+
+        public final List<String> sentTo = new ArrayList<>();
+
+        @Override
+        public void send(Notification notification, String toAddress, String recipientName) {
+            sentTo.add(toAddress);
         }
     }
 

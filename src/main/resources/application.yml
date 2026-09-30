@@ -50,6 +50,24 @@ spring:
           initial-interval: 1s
           multiplier: 2
 
+  # SMTP (mismas variables MAIL_* del security-service). Solo se usa si MAIL_ENABLED=true.
+  # Gmail: smtp.gmail.com:587 + contraseña de aplicación. Mailpit (dev): localhost:1025.
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_STARTTLS:true}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
 server:
   port: ${PORT:3006}
   shutdown: graceful
@@ -69,6 +87,10 @@ security:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  mail:
+    # false: el correo solo se anota en el log. true: se envía (hoy solo la bienvenida)
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:LavaRápido <no-reply@lavarapido.local>}
   messaging:
     # false: el servicio funciona sin RabbitMQ (solo bandeja + mensajes del admin)
     enabled: ${MESSAGING_ENABLED:false}
@@ -99,6 +121,9 @@ management:
     # sin RabbitMQ encendido el servicio sigue sano; con mensajería activa sí se revisa
     rabbit:
       enabled: ${MESSAGING_ENABLED:false}
+    # un SMTP caído no debe marcar el servicio como caído: el correo es secundario
+    mail:
+      enabled: false
   info:
     env:
       enabled: true

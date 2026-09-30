@@ -37,6 +37,12 @@
 			<artifactId>spring-boot-starter-amqp</artifactId>
 		</dependency>
 
+		<!-- Secondary adapter: email (welcome email, same SMTP settings as security-service) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
 		<!-- Security: this service only VERIFIES the token issued by security-service (ADR-006) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

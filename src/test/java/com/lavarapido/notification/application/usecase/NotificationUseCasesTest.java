@@ -3,6 +3,7 @@ package com.lavarapido.notification.application.usecase;
 import com.lavarapido.notification.application.fake.Fakes.InMemoryDevices;
 import com.lavarapido.notification.application.fake.Fakes.InMemoryNotifications;
 import com.lavarapido.notification.application.fake.Fakes.InMemoryProcessedEvents;
+import com.lavarapido.notification.application.fake.Fakes.RecordingEmailSender;
 import com.lavarapido.notification.application.fake.Fakes.RecordingPushSender;
 import com.lavarapido.notification.domain.exception.InvalidValueException;
 import com.lavarapido.notification.domain.exception.NotificationNotFoundException;
@@ -43,6 +44,7 @@ class NotificationUseCasesTest {
     private InMemoryNotifications notifications;
     private InMemoryDevices devices;
     private RecordingPushSender push;
+    private RecordingEmailSender email;
     private NotificationSendingService sender;
     private NotificationInboxService inbox;
     private DeviceRegistrationService registration;
@@ -52,7 +54,8 @@ class NotificationUseCasesTest {
         notifications = new InMemoryNotifications();
         devices = new InMemoryDevices();
         push = new RecordingPushSender();
-        sender = new NotificationSendingService(notifications, devices, push, clock);
+        email = new RecordingEmailSender();
+        sender = new NotificationSendingService(notifications, devices, push, email, clock);
         inbox = new NotificationInboxService(notifications, clock);
         registration = new DeviceRegistrationService(devices, clock);
     }
@@ -219,6 +222,26 @@ class NotificationUseCasesTest {
             assertEquals(1, items.size());
             assertEquals(NotificationTypeCode.PAYMENT_CONFIRMED, items.getFirst().type());
             assertFalse(items.getFirst().isRead());
+        }
+
+        @Test
+        @DisplayName("UserRegistered deja la bienvenida en la bandeja y la envía al correo del evento")
+        void welcomeGoesToInboxAndEmail() {
+            consumer.handle(new DomainEventEnvelope("evt-welcome", "UserRegistered", "20", Instant.now(), 1,
+                    Map.of("userId", 20, "email", "ana@gmail.com", "firstName", "Ana")));
+
+            Notification welcome = inbox.list(20, NotificationFilter.none(), 0, 20).items().getFirst();
+            assertEquals(NotificationTypeCode.USER_WELCOME, welcome.type());
+            assertEquals("¡Bienvenido a LavaRápido, Ana!", welcome.title());
+            assertEquals(List.of("ana@gmail.com"), email.sentTo);
+        }
+
+        @Test
+        @DisplayName("las notificaciones sin correo no envían email")
+        void othersDoNotEmail() {
+            consumer.handle(paymentConfirmed);
+
+            assertTrue(email.sentTo.isEmpty());
         }
 
         @Test
