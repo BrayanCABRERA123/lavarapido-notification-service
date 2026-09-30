@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Changelog del notification-service: solo el esquema `notification` (ADR-009).
+  Los archivos corren en el orden de esta lista, no alfabéticamente (06-data/migration-strategy.md).
+  Cada changeset tiene una precondición, así se marca como ejecutado en vez de fallar cuando el
+  script completo lavarapido-6-services-sqlserver.sql ya creó el objeto.
+
+  Numeración global del proyecto (migration-strategy.md), no reiniciada por servicio:
+    010  esquema y tablas del notification-service (igual al script completo)
+    016  device_token: celulares que reciben push (ADR-011, tabla nueva)
+    017  processed_event: idempotencia de eventos (ADR-011, tabla nueva)
+    108  seed de tipos de notificación
+  (014 y 015 los usa el customer-service)
+-->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <include file="db/changelog/010-create-notification-schema.sql"/>
+    <include file="db/changelog/016-create-notification-device-token.sql"/>
+    <include file="db/changelog/017-create-notification-processed-event.sql"/>
+    <include file="db/changelog/seed/108-seed-notification-type.sql"/>
+
+</databaseChangeLog>

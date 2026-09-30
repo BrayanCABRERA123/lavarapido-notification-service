@@ -1,0 +1,111 @@
+spring:
+  application:
+    name: notification-service
+  # En local arranca con dev, salvo que se diga otra cosa con SPRING_PROFILES_ACTIVE.
+  profiles:
+    default: dev
+  # Los secretos van en lavarapido-infra/.env, que no se sube al repositorio. Si este servicio
+  # tiene su propio .env, ese gana. Las variables de entorno mandan sobre los dos.
+  config:
+    import:
+      - optional:file:../lavarapido-infra/.env[.properties]
+      - optional:file:.env[.properties]
+
+  datasource:
+    url: ${DB_URL:jdbc:sqlserver://localhost:1433;databaseName=LavaRapido;encrypt=true;trustServerCertificate=true}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # las tablas las crea Liquibase, Hibernate solo revisa que el mapeo cuadre
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP
+        use_nationalized_character_data: true
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    # Cada servicio tiene su propia tabla de changelog, porque los seis migran la misma base.
+    database-change-log-table: DATABASECHANGELOG_NOTIFICATION
+    database-change-log-lock-table: DATABASECHANGELOGLOCK_NOTIFICATION
+
+  # RabbitMQ (ADR-004): solo se conecta si MESSAGING_ENABLED=true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        # un mensaje que falla se reintenta 3 veces con espera creciente y luego va a la DLQ
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+
+server:
+  port: ${PORT:3006}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+security:
+  jwt:
+    # El mismo secreto, emisor y audiencia que usa security-service. Este servicio solo revisa
+    # el token, no lo emite.
+    secret: ${JWT_SECRET:}
+    issuer: ${JWT_ISSUER:lavarapido-security-service}
+    audience: ${JWT_AUDIENCE:lavarapido-api}
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:1h}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  messaging:
+    # false: el servicio funciona sin RabbitMQ (solo bandeja + mensajes del admin)
+    enabled: ${MESSAGING_ENABLED:false}
+  push:
+    # false: las push solo se escriben en el log. true: se envían con el servicio de Expo
+    enabled: ${PUSH_ENABLED:false}
+    expo-url: ${EXPO_PUSH_URL:https://exp.host/--/api/v2/push/send}
+    # opcional: solo si en expo.dev se activa "Enhanced security for push"
+    access-token: ${EXPO_ACCESS_TOKEN:}
+    timeout: 10s
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    # sin RabbitMQ encendido el servicio sigue sano; con mensajería activa sí se revisa
+    rabbit:
+      enabled: ${MESSAGING_ENABLED:false}
+  info:
+    env:
+      enabled: true
+
+info:
+  service: notification-service
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{correlationId:-}]"
