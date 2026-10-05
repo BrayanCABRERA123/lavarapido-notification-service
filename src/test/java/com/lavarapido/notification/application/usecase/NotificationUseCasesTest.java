@@ -1,5 +1,6 @@
 package com.lavarapido.notification.application.usecase;
 
+import com.lavarapido.notification.application.fake.Fakes;
 import com.lavarapido.notification.application.fake.Fakes.InMemoryDevices;
 import com.lavarapido.notification.application.fake.Fakes.InMemoryNotifications;
 import com.lavarapido.notification.application.fake.Fakes.InMemoryProcessedEvents;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -210,7 +212,11 @@ class NotificationUseCasesTest {
 
         @BeforeEach
         void setUpConsumer() {
-            consumer = new DomainEventConsumerService(new InMemoryProcessedEvents(), sender, new EventNotificationFactory());
+            BookingReminderService reminders = new BookingReminderService(new Fakes.InMemoryReminders(), sender,
+                    new ReminderSettings(List.of(Duration.ofHours(24), Duration.ofHours(1)), 100),
+                    new EmailRecipients(new Fakes.InMemoryContacts()), clock);
+            consumer = new DomainEventConsumerService(new InMemoryProcessedEvents(), sender, new EventNotificationFactory(),
+                    reminders, new EmailRecipients(new Fakes.InMemoryContacts()));
         }
 
         @Test

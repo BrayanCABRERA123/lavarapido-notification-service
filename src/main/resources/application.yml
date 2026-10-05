@@ -101,6 +101,23 @@ app:
     # opcional: solo si en expo.dev se activa "Enhanced security for push"
     access-token: ${EXPO_ACCESS_TOKEN:}
     timeout: 10s
+  security-service:
+    # de aquí se pide el correo del usuario para los avisos de reserva y recordatorios
+    base-url: ${SECURITY_SERVICE_URL:http://localhost:3001}
+    timeout: 3s
+  internal:
+    # llave compartida con security-service para /internal/** (X-Internal-Key).
+    # Vacía: los avisos de reserva y recordatorios no van por correo (sí a la bandeja y push)
+    api-key: ${INTERNAL_API_KEY:}
+  reminders:
+    # recordatorios de reserva (bandeja, push y correo). false: se programan pero no se envían
+    enabled: ${REMINDERS_ENABLED:true}
+    # con cuánta anticipación se avisa, antes de la hora de la reserva
+    leads: ${REMINDER_LEADS:24h,1h}
+    # cada cuánto se revisan los recordatorios vencidos
+    check-interval: ${REMINDER_CHECK_INTERVAL:5m}
+    initial-delay: 30s
+    batch-size: 100
 
 springdoc:
   api-docs:

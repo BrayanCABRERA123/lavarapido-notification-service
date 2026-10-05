@@ -32,6 +32,11 @@ Swagger (perfil dev): http://localhost:3006/swagger-ui.html — haz login en el 
 | `PUSH_ENABLED` | `false` | `true`: envía las push con Expo. `false`: solo las escribe en el log |
 | `MAIL_ENABLED` | `false` | `true`: envía el correo de bienvenida con la configuración `MAIL_*` (la misma del security-service: Gmail o Mailpit) |
 | `EXPO_ACCESS_TOKEN` | vacío | Solo si en expo.dev se activa "Enhanced security for push" |
+| `REMINDERS_ENABLED` | `true` | Envía los recordatorios de reserva a su hora (bandeja + push) |
+| `REMINDER_LEADS` | `24h,1h` | Con cuánta anticipación se recuerda cada reserva |
+| `REMINDER_CHECK_INTERVAL` | `5m` | Cada cuánto se revisan los recordatorios vencidos |
+| `INTERNAL_API_KEY` | vacío | Llave compartida con security-service para pedir el correo del cliente |
+| `SECURITY_SERVICE_URL` | `http://localhost:3001` | Dónde está security-service |
 
 Con todo en `false` el servicio funciona igual: guarda las notificaciones y se ven en la bandeja.
 
@@ -61,6 +66,21 @@ El publicador debe mandar el `user_id` de quien recibe la notificación (tabla c
 `payment.confirmed` · `payment.rejected`
 
 Un evento repetido (mismo `eventId`) no crea la notificación dos veces.
+
+## Recordatorios de reserva
+
+Con `booking.confirmed` se programan recordatorios 24 h y 1 h antes de la cita (tabla
+`notification.booking_reminder`, migración 019); `booking.cancelled` los cancela y una reserva
+reprogramada los mueve a la nueva hora. Una tarea programada los envía a la bandeja
+(pestaña "Recordatorios"), por push y por correo.
+
+## Correo de reservas y recordatorios
+
+Las notificaciones de reserva (creada, confirmada, cancelada) y los recordatorios también van por
+correo. El correo no se guarda aquí: se pide a security-service en el momento con
+`GET /internal/v1/users/{id}/contact` y la llave compartida `INTERNAL_API_KEY` (encabezado
+`X-Internal-Key`). Sin llave, o con security-service caído, la notificación llega igual a la
+bandeja y por push, sin correo (ADR-011, sección 8).
 
 ## Push al celular
 
