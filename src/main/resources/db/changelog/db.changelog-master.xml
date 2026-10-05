@@ -9,8 +9,9 @@
     010  esquema y tablas del notification-service (igual al script completo)
     016  device_token: celulares que reciben push (ADR-011, tabla nueva)
     017  processed_event: idempotencia de eventos (ADR-011, tabla nueva)
+    019  booking_reminder: recordatorios de reserva programados (tabla nueva)
     108  seed de tipos de notificación
-  (014 y 015 los usa el customer-service)
+  (014 y 015 los usa el customer-service; 018, el booking-service)
 -->
 <databaseChangeLog
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
@@ -21,6 +22,7 @@
     <include file="db/changelog/010-create-notification-schema.sql"/>
     <include file="db/changelog/016-create-notification-device-token.sql"/>
     <include file="db/changelog/017-create-notification-processed-event.sql"/>
+    <include file="db/changelog/019-create-notification-booking-reminder.sql"/>
     <include file="db/changelog/seed/108-seed-notification-type.sql"/>
 
 </databaseChangeLog>

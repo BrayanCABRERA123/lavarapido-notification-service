@@ -1,6 +1,8 @@
 package com.lavarapido.notification.application.usecase;
 
+import com.lavarapido.notification.domain.model.BookingEventPayload;
 import com.lavarapido.notification.domain.model.DomainEventEnvelope;
+import com.lavarapido.notification.domain.port.in.BookingReminderUseCase;
 import com.lavarapido.notification.domain.port.in.ConsumeDomainEventUseCase;
 import com.lavarapido.notification.domain.port.in.SendNotificationCommand;
 import com.lavarapido.notification.domain.port.in.SendNotificationUseCase;
@@ -14,25 +16,34 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * Convierte los eventos de los otros servicios en notificaciones.
+ * Convierte los eventos de los otros servicios en notificaciones y, con los de reserva, programa
+ * o cancela los recordatorios.
  *
  * Idempotente (cross-cutting.md §7): el eventId se registra en la misma transacción que las
- * notificaciones, así un evento repetido no las duplica y uno que falló se puede reintentar.
+ * notificaciones y los recordatorios, así un evento repetido no los duplica y uno que falló se
+ * puede reintentar.
  */
 @Service
 public class DomainEventConsumerService implements ConsumeDomainEventUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(DomainEventConsumerService.class);
+    private static final String BOOKING_CONFIRMED = "BookingConfirmed";
+    private static final String BOOKING_CANCELLED = "BookingCancelled";
 
     private final ProcessedEventRepository processedEvents;
     private final SendNotificationUseCase sender;
     private final EventNotificationFactory factory;
+    private final BookingReminderUseCase reminders;
+    private final EmailRecipients emailRecipients;
 
     public DomainEventConsumerService(ProcessedEventRepository processedEvents, SendNotificationUseCase sender,
-                                      EventNotificationFactory factory) {
+                                      EventNotificationFactory factory, BookingReminderUseCase reminders,
+                                      EmailRecipients emailRecipients) {
         this.processedEvents = processedEvents;
         this.sender = sender;
         this.factory = factory;
+        this.reminders = reminders;
+        this.emailRecipients = emailRecipients;
     }
 
     @Override
@@ -47,9 +58,23 @@ public class DomainEventConsumerService implements ConsumeDomainEventUseCase {
             return;
         }
 
-        List<SendNotificationCommand> commands = factory.from(event);
+        // las de reserva también van por correo (ADR-011, sección 8)
+        List<SendNotificationCommand> commands = factory.from(event).stream().map(emailRecipients::withEmail).toList();
         sender.sendAll(commands);
+        updateReminders(event);
         processedEvents.record(event.eventId(), event.eventType());
         log.info("Event {} ({}) produced {} notification(s)", event.eventId(), event.eventType(), commands.size());
+    }
+
+    /** Una reserva confirmada (o reprogramada) programa recordatorios; una cancelada los quita. */
+    private void updateReminders(DomainEventEnvelope event) {
+        if (BOOKING_CONFIRMED.equals(event.eventType())) {
+            BookingEventPayload.from(event)
+                    .filter(BookingEventPayload::canBeReminded)
+                    .ifPresent(booking -> reminders.schedule(booking.bookingId(), booking.customerUserId(),
+                            booking.bookingCode(), booking.scheduledStart()));
+        } else if (BOOKING_CANCELLED.equals(event.eventType())) {
+            BookingEventPayload.from(event).ifPresent(booking -> reminders.cancel(booking.bookingId()));
+        }
     }
 }
