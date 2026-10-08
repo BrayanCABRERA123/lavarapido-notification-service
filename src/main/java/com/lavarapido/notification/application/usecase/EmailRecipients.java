@@ -10,8 +10,8 @@ import java.util.Set;
 
 /**
  * Decide qué notificaciones también van por correo y le pone el correo actual del usuario,
- * pedido a security-service. Hoy: reservas (creada, confirmada, cancelada) y recordatorios.
- * La bienvenida ya trae su correo en el evento.
+ * pedido a security-service. Hoy: reservas (creada, confirmada, cancelada), recordatorios y
+ * canje de cupones de fidelización. La bienvenida ya trae su correo en el evento.
  *
  * Si no se puede obtener el correo, o la cuenta está desactivada, la notificación sigue igual
  * (bandeja + push) sin correo.
@@ -23,7 +23,8 @@ public class EmailRecipients {
             NotificationTypeCode.BOOKING_CREATED,
             NotificationTypeCode.BOOKING_CONFIRMED,
             NotificationTypeCode.BOOKING_CANCELLED,
-            NotificationTypeCode.BOOKING_REMINDER);
+            NotificationTypeCode.BOOKING_REMINDER,
+            NotificationTypeCode.PROMOTION_REDEEMED);
 
     private final UserContactDirectory contacts;
 
