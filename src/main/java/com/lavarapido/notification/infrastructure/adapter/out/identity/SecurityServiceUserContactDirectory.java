@@ -12,11 +12,13 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 /**
  * Pide el contacto a security-service: GET /internal/v1/users/{id}/contact con la llave interna
  * (X-Internal-Key). Sin llave configurada no llama a nadie y las notificaciones van sin correo.
+ * También pide los administradores activos para los avisos del personal.
  */
 @Component
 class SecurityServiceUserContactDirectory implements UserContactDirectory {
@@ -58,6 +60,25 @@ class SecurityServiceUserContactDirectory implements UserContactDirectory {
         } catch (RestClientException e) {
             log.warn("Could not read the contact of user {} from security-service: {}", userId, e.getMessage());
             return Optional.empty();
+        }
+    }
+
+    /** GET /internal/v1/users/admins: sin respuesta, los avisos para el administrador no se crean. */
+    @Override
+    public List<Long> activeAdminIds() {
+        if (apiKey.isEmpty()) {
+            return List.of();
+        }
+        try {
+            Long[] ids = client.get()
+                    .uri("/internal/v1/users/admins")
+                    .header(HEADER, apiKey)
+                    .retrieve()
+                    .body(Long[].class);
+            return ids == null ? List.of() : List.of(ids);
+        } catch (RestClientException e) {
+            log.warn("Could not read the administrators from security-service: {}", e.getMessage());
+            return List.of();
         }
     }
 }

@@ -35,15 +35,17 @@ public class DomainEventConsumerService implements ConsumeDomainEventUseCase {
     private final EventNotificationFactory factory;
     private final BookingReminderUseCase reminders;
     private final EmailRecipients emailRecipients;
+    private final StaffNotificationService staff;
 
     public DomainEventConsumerService(ProcessedEventRepository processedEvents, SendNotificationUseCase sender,
                                       EventNotificationFactory factory, BookingReminderUseCase reminders,
-                                      EmailRecipients emailRecipients) {
+                                      EmailRecipients emailRecipients, StaffNotificationService staff) {
         this.processedEvents = processedEvents;
         this.sender = sender;
         this.factory = factory;
         this.reminders = reminders;
         this.emailRecipients = emailRecipients;
+        this.staff = staff;
     }
 
     @Override
@@ -62,8 +64,11 @@ public class DomainEventConsumerService implements ConsumeDomainEventUseCase {
         List<SendNotificationCommand> commands = factory.from(event).stream().map(emailRecipients::withEmail).toList();
         sender.sendAll(commands);
         updateReminders(event);
+        // operario y administrador (RF-018): sus propios avisos, sin correo
+        int staffNotifications = staff.handle(event);
         processedEvents.record(event.eventId(), event.eventType());
-        log.info("Event {} ({}) produced {} notification(s)", event.eventId(), event.eventType(), commands.size());
+        log.info("Event {} ({}) produced {} notification(s) and {} for staff", event.eventId(), event.eventType(),
+                commands.size(), staffNotifications);
     }
 
     /** Una reserva confirmada (o reprogramada) programa recordatorios; una cancelada los quita. */

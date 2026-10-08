@@ -2,6 +2,7 @@ package com.lavarapido.notification.infrastructure.config;
 
 import com.lavarapido.notification.application.usecase.ReminderSettings;
 import com.lavarapido.notification.domain.service.EventNotificationFactory;
+import com.lavarapido.notification.domain.service.StaffNotificationFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,6 +31,11 @@ class DomainConfig {
     @Bean
     EventNotificationFactory eventNotificationFactory() {
         return new EventNotificationFactory();
+    }
+
+    @Bean
+    StaffNotificationFactory staffNotificationFactory() {
+        return new StaffNotificationFactory();
     }
 
     /** Con cuánta anticipación se recuerda una reserva (app.reminders.leads, ej. "24h,1h"). */

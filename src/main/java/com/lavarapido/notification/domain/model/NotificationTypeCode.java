@@ -23,7 +23,14 @@ public enum NotificationTypeCode {
     // confirmación de canje de un cupón en el pago (payment.promotion_redeemed, migración 025)
     PROMOTION_REDEEMED(NotificationCategory.CONFIRMATION),
     // mensaje que escribe el administrador (y la forma de probar el servicio sin los demás)
-    SYSTEM_MESSAGE(NotificationCategory.SYSTEM);
+    SYSTEM_MESSAGE(NotificationCategory.SYSTEM),
+    // avisos para el personal (migración 027): solo bandeja y push, nunca correo
+    OPERATOR_SERVICE_CANCELLED(NotificationCategory.CANCELLATION),
+    OPERATOR_SERVICE_RESCHEDULED(NotificationCategory.MESSAGE),
+    OPERATOR_SERVICE_UNASSIGNED(NotificationCategory.CANCELLATION),
+    ADMIN_BOOKING_CREATED(NotificationCategory.CONFIRMATION),
+    ADMIN_BOOKING_RESCHEDULED(NotificationCategory.MESSAGE),
+    ADMIN_BOOKING_CANCELLED(NotificationCategory.CANCELLATION);
 
     private final NotificationCategory category;
 

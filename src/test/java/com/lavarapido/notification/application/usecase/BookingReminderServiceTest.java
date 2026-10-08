@@ -13,6 +13,8 @@ import com.lavarapido.notification.domain.model.NotificationCategory;
 import com.lavarapido.notification.domain.model.NotificationFilter;
 import com.lavarapido.notification.domain.model.NotificationTypeCode;
 import com.lavarapido.notification.domain.service.EventNotificationFactory;
+import com.lavarapido.notification.domain.service.StaffNotificationFactory;
+import com.lavarapido.notification.application.fake.Fakes.InMemoryBookingTracking;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -130,7 +132,8 @@ class BookingReminderServiceTest {
     void eventsDriveTheReminders() {
         BookingReminderService service = at("2026-09-29T12:00:00Z");
         DomainEventConsumerService consumer = new DomainEventConsumerService(new InMemoryProcessedEvents(), sender,
-                new EventNotificationFactory(), service, new EmailRecipients(contacts));
+                new EventNotificationFactory(), service, new EmailRecipients(contacts),
+                new StaffNotificationService(new InMemoryBookingTracking(), contacts, new StaffNotificationFactory(), sender));
 
         consumer.handle(new DomainEventEnvelope("evt-1", "BookingConfirmed", "1", Instant.parse("2026-09-29T12:00:00Z"), 1,
                 Map.of("bookingId", 1, "bookingCode", "RES-000001", "customerUserId", ANA, "scheduledStart", START)));
@@ -146,7 +149,8 @@ class BookingReminderServiceTest {
     void incompleteEventIsIgnored() {
         BookingReminderService service = at("2026-09-29T12:00:00Z");
         DomainEventConsumerService consumer = new DomainEventConsumerService(new InMemoryProcessedEvents(), sender,
-                new EventNotificationFactory(), service, new EmailRecipients(contacts));
+                new EventNotificationFactory(), service, new EmailRecipients(contacts),
+                new StaffNotificationService(new InMemoryBookingTracking(), contacts, new StaffNotificationFactory(), sender));
 
         consumer.handle(new DomainEventEnvelope("evt-3", "BookingConfirmed", "2", Instant.parse("2026-09-29T12:00:00Z"), 1,
                 Map.of("bookingId", 2, "bookingCode", "RES-000002")));
@@ -179,7 +183,8 @@ class BookingReminderServiceTest {
     void confirmedBookingIsEmailed() {
         BookingReminderService service = at("2026-09-29T12:00:00Z");
         DomainEventConsumerService consumer = new DomainEventConsumerService(new InMemoryProcessedEvents(), sender,
-                new EventNotificationFactory(), service, new EmailRecipients(contacts));
+                new EventNotificationFactory(), service, new EmailRecipients(contacts),
+                new StaffNotificationService(new InMemoryBookingTracking(), contacts, new StaffNotificationFactory(), sender));
 
         consumer.handle(new DomainEventEnvelope("evt-9", "BookingConfirmed", "1", Instant.parse("2026-09-29T12:00:00Z"), 1,
                 Map.of("bookingId", 1, "bookingCode", "RES-000001", "customerUserId", ANA, "scheduledStart", START)));

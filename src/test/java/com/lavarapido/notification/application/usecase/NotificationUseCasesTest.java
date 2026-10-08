@@ -16,6 +16,7 @@ import com.lavarapido.notification.domain.model.NotificationFilter;
 import com.lavarapido.notification.domain.model.NotificationTypeCode;
 import com.lavarapido.notification.domain.port.in.SendNotificationCommand;
 import com.lavarapido.notification.domain.service.EventNotificationFactory;
+import com.lavarapido.notification.domain.service.StaffNotificationFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -216,7 +217,9 @@ class NotificationUseCasesTest {
                     new ReminderSettings(List.of(Duration.ofHours(24), Duration.ofHours(1)), 100),
                     new EmailRecipients(new Fakes.InMemoryContacts()), clock);
             consumer = new DomainEventConsumerService(new InMemoryProcessedEvents(), sender, new EventNotificationFactory(),
-                    reminders, new EmailRecipients(new Fakes.InMemoryContacts()));
+                    reminders, new EmailRecipients(new Fakes.InMemoryContacts()),
+                    new StaffNotificationService(new Fakes.InMemoryBookingTracking(), new Fakes.InMemoryContacts(),
+                            new StaffNotificationFactory(), sender));
         }
 
         @Test

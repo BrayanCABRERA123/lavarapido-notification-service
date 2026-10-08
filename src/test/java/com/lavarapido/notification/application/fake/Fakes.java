@@ -5,7 +5,9 @@ import com.lavarapido.notification.domain.model.DeviceToken;
 import com.lavarapido.notification.domain.model.Notification;
 import com.lavarapido.notification.domain.model.NotificationFilter;
 import com.lavarapido.notification.domain.model.PageResult;
+import com.lavarapido.notification.domain.model.TrackedBooking;
 import com.lavarapido.notification.domain.port.out.BookingReminderRepository;
+import com.lavarapido.notification.domain.port.out.BookingTrackingRepository;
 import com.lavarapido.notification.domain.port.out.DeviceTokenRepository;
 import com.lavarapido.notification.domain.port.out.EmailSender;
 import com.lavarapido.notification.domain.port.out.NotificationRepository;
@@ -251,15 +253,41 @@ public final class Fakes {
     public static final class InMemoryContacts implements UserContactDirectory {
 
         public final Map<Long, UserContact> contacts = new LinkedHashMap<>();
+        public final List<Long> admins = new ArrayList<>();
 
         public InMemoryContacts with(long userId, String email, String firstName, boolean active) {
             contacts.put(userId, new UserContact(userId, email, firstName, active));
             return this;
         }
 
+        public InMemoryContacts withAdmins(Long... ids) {
+            admins.addAll(List.of(ids));
+            return this;
+        }
+
         @Override
         public Optional<UserContact> contactOf(long userId) {
             return Optional.ofNullable(contacts.get(userId));
+        }
+
+        @Override
+        public List<Long> activeAdminIds() {
+            return List.copyOf(admins);
+        }
+    }
+
+    public static final class InMemoryBookingTracking implements BookingTrackingRepository {
+
+        public final Map<Long, TrackedBooking> rows = new LinkedHashMap<>();
+
+        @Override
+        public Optional<TrackedBooking> find(long bookingId) {
+            return Optional.ofNullable(rows.get(bookingId));
+        }
+
+        @Override
+        public void save(TrackedBooking booking) {
+            rows.put(booking.bookingId(), booking);
         }
     }
 }

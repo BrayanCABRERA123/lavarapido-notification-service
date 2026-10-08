@@ -93,6 +93,75 @@ class NotificationFactoryTest {
     }
 
     @Test
+    @DisplayName("quien se registra solo recibe la bienvenida de cliente, sin la nota de la contraseña")
+    void selfRegisteredClientWelcome() {
+        String message = factory.from(event("UserRegistered", Map.of("userId", 12, "roles", List.of("CLIENT"),
+                "createdByAdmin", false))).getFirst().message();
+
+        assertTrue(message.contains("reservar tu primer lavado"), message);
+        assertFalse(message.contains("contraseña"), message);
+    }
+
+    @Test
+    @DisplayName("un operario creado por el admin recibe la bienvenida de operario y cómo entrar")
+    void operatorCreatedByAdminWelcome() {
+        String message = factory.from(event("UserRegistered", Map.of("userId", 12, "roles", List.of("OPERATOR"),
+                "createdByAdmin", true))).getFirst().message();
+
+        assertTrue(message.contains("como operario"), message);
+        assertFalse(message.contains("vehículos"), message);
+        assertTrue(message.contains("Un administrador creó tu cuenta"), message);
+        assertTrue(message.contains("¿Olvidaste tu contraseña?"), message);
+    }
+
+    @Test
+    @DisplayName("si la cuenta tiene varios roles, la bienvenida es la del de más privilegios")
+    void adminWinsOverOtherRoles() {
+        String message = factory.from(event("UserRegistered", Map.of("userId", 12,
+                "roles", List.of("CLIENT", "ADMIN"), "createdByAdmin", true))).getFirst().message();
+
+        assertTrue(message.contains("cuenta de administrador"), message);
+    }
+
+    @Test
+    @DisplayName("un evento viejo sin roles ni createdByAdmin sigue dando la bienvenida de cliente")
+    void oldEventWithoutTheNewFields() {
+        String message = factory.from(event("UserRegistered", Map.of("userId", 12))).getFirst().message();
+
+        assertTrue(message.contains("reservar tu primer lavado"), message);
+        assertFalse(message.contains("contraseña"), message);
+    }
+
+    @Test
+    @DisplayName("PromotionRedeemed confirma el cupón con el nombre, la reserva y el descuento")
+    void confirmsRedeemedCoupon() {
+        // mismo payload que publica payment-service (LoyaltyApplicationService.RedeemAsync)
+        List<SendNotificationCommand> commands = factory.from(event("PromotionRedeemed", Map.of(
+                "customerUserId", 7, "bookingId", 145, "bookingCode", "RES-000145",
+                "promotionCode", "LAVA20", "promotionName", "Lavado 20%", "discountAmount", 12500.0)));
+
+        assertEquals(1, commands.size());
+        SendNotificationCommand command = commands.getFirst();
+        assertEquals(7, command.userId());
+        assertEquals(NotificationTypeCode.PROMOTION_REDEEMED, command.type());
+        assertEquals("booking", command.referenceEntity());
+        assertEquals(145L, command.referenceId());
+        assertEquals("Cupón canjeado: Lavado 20%", command.title());
+        assertTrue(command.message().contains("RES-000145"), command.message());
+        assertTrue(command.message().contains("$12.500"), command.message());
+    }
+
+    @Test
+    @DisplayName("PromotionRedeemed sin nombre ni monto sigue armando un mensaje legible")
+    void redeemedCouponWithoutOptionalData() {
+        SendNotificationCommand command = factory.from(event("PromotionRedeemed",
+                Map.of("customerUserId", 7))).getFirst();
+
+        assertEquals("Cupón canjeado: tu promoción", command.title());
+        assertFalse(command.message().contains("descontamos"), command.message());
+    }
+
+    @Test
     @DisplayName("sin el user_id del destinatario no se crea notificación")
     void skipsWithoutRecipient() {
         assertTrue(factory.from(event("BookingCreated", Map.of("bookingId", 145))).isEmpty());

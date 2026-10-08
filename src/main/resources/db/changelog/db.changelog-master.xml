@@ -25,5 +25,6 @@
     <include file="db/changelog/019-create-notification-booking-reminder.sql"/>
     <include file="db/changelog/seed/108-seed-notification-type.sql"/>
     <include file="db/changelog/025-notification-promotion-redeemed-type.sql"/>
+    <include file="db/changelog/027-notification-staff-notifications.sql"/>
 
 </databaseChangeLog>

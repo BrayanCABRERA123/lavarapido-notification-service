@@ -43,8 +43,7 @@ public final class EventNotificationFactory {
                     String name = text(p, "firstName");
                     commands.add(new SendNotificationCommand(user, NotificationTypeCode.USER_WELCOME,
                             name == null ? "¡Bienvenido a LavaRápido!" : "¡Bienvenido a LavaRápido, " + name + "!",
-                            "Tu cuenta quedó creada. Ya puedes registrar tus vehículos y reservar tu primer lavado.",
-                            null, null, email(p), name));
+                            welcomeMessage(p), null, null, email(p), name));
                 }
             }
             case "BookingCreated" -> add(commands, userId(p, "customerUserId"), NotificationTypeCode.BOOKING_CREATED,
@@ -141,6 +140,33 @@ public final class EventNotificationFactory {
         return value != null && value.length() <= 254 && value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$") ? value : null;
     }
 
+    /**
+     * La bienvenida según el rol (gana el de más privilegios, igual que la pantalla de inicio) y
+     * según quién abrió la cuenta: si fue un administrador, la persona no eligió su contraseña y
+     * se le explica cómo entrar. La contraseña nunca va en la notificación ni en el correo.
+     */
+    private static String welcomeMessage(Map<String, Object> payload) {
+        List<String> roles = roles(payload);
+        String start = roles.contains("ADMIN")
+                ? "Tu cuenta de administrador quedó creada. Desde el panel gestionas reservas, operarios, pagos y la configuración del lavadero."
+                : roles.contains("OPERATOR")
+                ? "Ya haces parte del equipo de LavaRápido como operario. En la app verás los servicios que te asignen y podrás iniciarlos y finalizarlos."
+                : "Tu cuenta quedó creada. Ya puedes registrar tus vehículos y reservar tu primer lavado.";
+        if (!Boolean.TRUE.equals(payload.get("createdByAdmin"))) {
+            return start;
+        }
+        return start + " Un administrador creó tu cuenta con este correo: para entrar, pídele tu contraseña"
+                + " o usa \"¿Olvidaste tu contraseña?\" en el inicio de sesión para crear una nueva.";
+    }
+
+    private static List<String> roles(Map<String, Object> payload) {
+        Object value = payload.get("roles");
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        return list.stream().filter(String.class::isInstance).map(String.class::cast).toList();
+    }
+
     private static String bookingCode(Map<String, Object> payload) {
         Object code = payload.get("bookingCode");
         return code instanceof String text && !text.isBlank() ? " " + text.strip() : "";
@@ -179,11 +205,16 @@ public final class EventNotificationFactory {
         Object value = payload.get("scheduledStart");
         if (value instanceof String text) {
             try {
-                return DATE_TIME.format(Instant.parse(text).atZone(COLOMBIA));
+                return formatWhen(Instant.parse(text));
             } catch (DateTimeParseException ignored) {
                 // se usa el texto genérico de abajo
             }
         }
-        return "horario reservado";
+        return formatWhen(null);
+    }
+
+    /** "08/10/2026 a las 07:30" en hora de Colombia; sin hora, un texto genérico. */
+    static String formatWhen(Instant start) {
+        return start == null ? "horario reservado" : DATE_TIME.format(start.atZone(COLOMBIA));
     }
 }
