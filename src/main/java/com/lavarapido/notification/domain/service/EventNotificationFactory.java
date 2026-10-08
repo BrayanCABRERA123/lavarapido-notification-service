@@ -92,6 +92,10 @@ public final class EventNotificationFactory {
                     "Pago rechazado",
                     "No pudimos aprobar tu pago" + amount(p) + "." + reason(p) + " Puedes intentarlo de nuevo.",
                     PAYMENT, id(p, "paymentId"));
+            case "PromotionRedeemed" -> add(commands, userId(p, "customerUserId"), NotificationTypeCode.PROMOTION_REDEEMED,
+                    "Cupón canjeado: " + promotionName(p),
+                    "Canjeaste el cupón " + promotionName(p) + " en tu reserva" + bookingCode(p) + discountAmount(p) + ".",
+                    BOOKING, id(p, "bookingId"));
             default -> {
                 // eventos que no generan notificación (UserAuthenticated, RatingSubmitted...)
             }
@@ -153,6 +157,20 @@ public final class EventNotificationFactory {
             // pesos colombianos sin decimales: 45000 -> $45.000
             String digits = String.format("%,d", Math.round(number.doubleValue())).replace(',', '.');
             return " de $" + digits;
+        }
+        return "";
+    }
+
+    private static String promotionName(Map<String, Object> payload) {
+        String name = text(payload, "promotionName");
+        return name == null ? "tu promoción" : name;
+    }
+
+    private static String discountAmount(Map<String, Object> payload) {
+        Object value = payload.get("discountAmount");
+        if (value instanceof Number number) {
+            String digits = String.format("%,d", Math.round(number.doubleValue())).replace(',', '.');
+            return ": te descontamos $" + digits;
         }
         return "";
     }
