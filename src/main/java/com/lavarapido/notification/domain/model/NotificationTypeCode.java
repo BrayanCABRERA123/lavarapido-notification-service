@@ -20,6 +20,8 @@ public enum NotificationTypeCode {
     PAYMENT_CONFIRMED(NotificationCategory.CONFIRMATION),
     PAYMENT_REJECTED(NotificationCategory.CANCELLATION),
     PROMOTION_AVAILABLE(NotificationCategory.PROMOTION),
+    // confirmación de canje de un cupón en el pago (payment.promotion_redeemed, migración 025)
+    PROMOTION_REDEEMED(NotificationCategory.CONFIRMATION),
     // mensaje que escribe el administrador (y la forma de probar el servicio sin los demás)
     SYSTEM_MESSAGE(NotificationCategory.SYSTEM);
 
