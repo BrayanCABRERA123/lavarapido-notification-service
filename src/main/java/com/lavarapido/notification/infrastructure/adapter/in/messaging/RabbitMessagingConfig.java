@@ -43,7 +43,8 @@ class RabbitMessagingConfig {
             "execution.service_started",
             "execution.service_completed",
             "payment.confirmed",
-            "payment.rejected");
+            "payment.rejected",
+            "payment.promotion_redeemed");
 
     @Bean
     Declarables notificationTopology() {
