@@ -51,7 +51,7 @@ Con todo en `false` el servicio funciona igual: guarda las notificaciones y se v
 | DELETE | `/notifications/{id}` | Borrar (lógico, `deleted_at`) |
 | PUT | `/notifications/devices` | Registrar el celular para push: `{ "token": "ExponentPushToken[...]", "platform": "ANDROID" }` |
 | POST | `/notifications/devices/unregister` | Quitar el celular (al cerrar sesión): `{ "token": "..." }` |
-| POST | `/admin/notifications` | **Solo ADMIN.** Enviar mensaje: `{ "userIds": [3], "title": "...", "message": "..." }` |
+| POST | `/admin/notifications` | **Solo ADMIN.** Enviar mensaje: `{ "userIds": [3], "type": "INSPECTION_REPORT", "title": "...", "message": "..." }`. `type` es opcional (por defecto `SYSTEM_MESSAGE`, solo bandeja); `INSPECTION_REPORT` (aviso de la inspección del vehículo) también sale por correo. Cualquier otro tipo responde 400 `NOTIFICATION_TYPE_NOT_ALLOWED` (esos los generan los eventos) |
 
 Nadie puede ver ni marcar notificaciones de otro usuario: responde 404, igual que si no existiera.
 Los errores salen en RFC 9457 con `code` (ej. `NOTIFICATION_NOT_FOUND`, `INVALID_DEVICE_TOKEN`).
@@ -63,7 +63,12 @@ El publicador debe mandar el `user_id` de quien recibe la notificación (tabla c
 
 `security.user_registered` · `booking.created` · `booking.confirmed` · `booking.cancelled` ·
 `execution.operator_assigned` · `execution.service_started` · `execution.service_completed` ·
-`payment.confirmed` · `payment.rejected`
+`payment.confirmed` · `payment.rejected` · `payment.refunded` · `payment.promotion_redeemed` ·
+`payment.loyalty_points_earned`
+
+Con `payment.loyalty_points_earned` el cliente recibe "Ganaste N puntos" (solo bandeja) y, por cada
+cupón que esos puntos desbloquearon, "¡Tienes un cupón canjeable!" con el código (bandeja y correo).
+Tipos nuevos en la migración 029 (ADR-011 sección 11).
 
 Un evento repetido (mismo `eventId`) no crea la notificación dos veces.
 
@@ -81,6 +86,11 @@ correo. El correo no se guarda aquí: se pide a security-service en el momento c
 `GET /internal/v1/users/{id}/contact` y la llave compartida `INTERNAL_API_KEY` (encabezado
 `X-Internal-Key`). Sin llave, o con security-service caído, la notificación llega igual a la
 bandeja y por push, sin correo (ADR-011, sección 8).
+
+El mismo contacto trae los interruptores de Configuración > Notificaciones y se respetan al enviar
+(ADR-011, sección 12): con "Notificaciones push" apagado no hay push; con "Recordatorios por email"
+apagado el recordatorio no va al correo; con "Promociones" apagado el cupón desbloqueado no va ni al
+correo ni por push. La bandeja siempre se llena.
 
 ## Push al celular
 
