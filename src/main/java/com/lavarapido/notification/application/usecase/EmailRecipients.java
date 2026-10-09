@@ -10,11 +10,17 @@ import java.util.Set;
 
 /**
  * Decide qué notificaciones también van por correo y le pone el correo actual del usuario,
- * pedido a security-service. Hoy: reservas (creada, confirmada, cancelada), recordatorios y
- * canje de cupones de fidelización. La bienvenida ya trae su correo en el evento.
+ * pedido a security-service. Hoy: reservas (creada, confirmada, cancelada), recordatorios,
+ * canje de cupones, cupón desbloqueado con puntos, el resultado de un pago (aprobado, rechazado,
+ * reembolsado) y el aviso de inspección del vehículo: todo lo que le cambia algo al cliente. La
+ * bienvenida ya trae su correo en el evento.
+ *
+ * El avance del servicio (operario asignado, iniciado, terminado), los puntos ganados y los avisos
+ * del personal (operario y administrador) se quedan en la bandeja y el push, sin correo.
  *
  * Si no se puede obtener el correo, o la cuenta está desactivada, la notificación sigue igual
- * (bandeja + push) sin correo.
+ * (bandeja + push) sin correo. Tampoco se envía si el usuario apagó ese canal en Configuración >
+ * Notificaciones: correo de recordatorios o promociones (NotificationChannels).
  */
 @Component
 public class EmailRecipients {
@@ -24,7 +30,12 @@ public class EmailRecipients {
             NotificationTypeCode.BOOKING_CONFIRMED,
             NotificationTypeCode.BOOKING_CANCELLED,
             NotificationTypeCode.BOOKING_REMINDER,
-            NotificationTypeCode.PROMOTION_REDEEMED);
+            NotificationTypeCode.PROMOTION_REDEEMED,
+            NotificationTypeCode.PAYMENT_CONFIRMED,
+            NotificationTypeCode.PAYMENT_REJECTED,
+            NotificationTypeCode.PAYMENT_REFUNDED,
+            NotificationTypeCode.PROMOTION_AVAILABLE,
+            NotificationTypeCode.INSPECTION_REPORT);
 
     private final UserContactDirectory contacts;
 
@@ -39,6 +50,8 @@ public class EmailRecipients {
         return contacts.contactOf(command.userId())
                 .filter(UserContactDirectory.UserContact::active)
                 .filter(contact -> contact.email() != null && !contact.email().isBlank())
+                // el usuario pudo apagar el correo de recordatorios o las promociones
+                .filter(contact -> NotificationChannels.wantsEmail(contact, command.type()))
                 .map(contact -> new SendNotificationCommand(command.userId(), command.type(), command.title(),
                         command.message(), command.referenceEntity(), command.referenceId(), contact.email(),
                         contact.firstName()))

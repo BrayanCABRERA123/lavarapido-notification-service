@@ -19,7 +19,14 @@ public enum NotificationTypeCode {
     SERVICE_COMPLETED(NotificationCategory.CONFIRMATION),
     PAYMENT_CONFIRMED(NotificationCategory.CONFIRMATION),
     PAYMENT_REJECTED(NotificationCategory.CANCELLATION),
+    // el admin devolvió un pago aprobado (payment.refunded, migración 028)
+    PAYMENT_REFUNDED(NotificationCategory.MESSAGE),
+    // con los puntos ganados el cliente desbloqueó un cupón (payment.loyalty_points_earned)
     PROMOTION_AVAILABLE(NotificationCategory.PROMOTION),
+    // puntos de fidelización que ganó una reserva pagada (migración 029)
+    LOYALTY_POINTS_EARNED(NotificationCategory.PROMOTION),
+    // el admin le avisa al cliente que terminó la inspección de su vehículo (migración 029)
+    INSPECTION_REPORT(NotificationCategory.MESSAGE),
     // confirmación de canje de un cupón en el pago (payment.promotion_redeemed, migración 025)
     PROMOTION_REDEEMED(NotificationCategory.CONFIRMATION),
     // mensaje que escribe el administrador (y la forma de probar el servicio sin los demás)
