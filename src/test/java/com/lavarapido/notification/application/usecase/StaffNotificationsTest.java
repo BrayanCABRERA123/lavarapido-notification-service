@@ -60,7 +60,7 @@ class StaffNotificationsTest {
                 .with(ADMIN, "admin@gmail.com", "Admin", true)
                 .withAdmins(ADMIN);
         NotificationSendingService sender = new NotificationSendingService(notifications, new InMemoryDevices(),
-                new RecordingPushSender(), email, clock);
+                new RecordingPushSender(), email, contacts, clock);
         BookingReminderService reminders = new BookingReminderService(new InMemoryReminders(), sender,
                 new ReminderSettings(List.of(Duration.ofHours(24)), 100), new EmailRecipients(contacts), clock);
         consumer = new DomainEventConsumerService(new InMemoryProcessedEvents(), sender, new EventNotificationFactory(),
@@ -201,7 +201,7 @@ class StaffNotificationsTest {
         Clock clock = Clock.systemUTC();
         InMemoryContacts withoutAdmins = new InMemoryContacts();
         NotificationSendingService sender = new NotificationSendingService(notifications, new InMemoryDevices(),
-                new RecordingPushSender(), email, clock);
+                new RecordingPushSender(), email, withoutAdmins, clock);
         StaffNotificationService staff = new StaffNotificationService(tracking, withoutAdmins,
                 new StaffNotificationFactory(), sender);
 

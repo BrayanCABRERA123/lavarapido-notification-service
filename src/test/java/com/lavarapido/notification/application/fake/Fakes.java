@@ -256,7 +256,15 @@ public final class Fakes {
         public final List<Long> admins = new ArrayList<>();
 
         public InMemoryContacts with(long userId, String email, String firstName, boolean active) {
-            contacts.put(userId, new UserContact(userId, email, firstName, active));
+            contacts.put(userId, new UserContact(userId, email, firstName, active, null, null, null));
+            return this;
+        }
+
+        /** Interruptores de Configuración > Notificaciones (push, correo de recordatorios, promociones). */
+        public InMemoryContacts withChannels(long userId, boolean push, boolean emailReminders, boolean promotions) {
+            UserContact current = contacts.getOrDefault(userId, new UserContact(userId, null, null, true, null, null, null));
+            contacts.put(userId, new UserContact(userId, current.email(), current.firstName(), current.active(), push,
+                    emailReminders, promotions));
             return this;
         }
 

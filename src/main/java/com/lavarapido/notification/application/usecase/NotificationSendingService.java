@@ -8,6 +8,7 @@ import com.lavarapido.notification.domain.port.out.DeviceTokenRepository;
 import com.lavarapido.notification.domain.port.out.EmailSender;
 import com.lavarapido.notification.domain.port.out.NotificationRepository;
 import com.lavarapido.notification.domain.port.out.PushSender;
+import com.lavarapido.notification.domain.port.out.UserContactDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,9 @@ import java.util.List;
  * Guarda la notificación en la bandeja, la manda por push a los celulares del usuario y, si el
  * comando trae correo, también por email. Push y correo son extras: si fallan o no aplican, la
  * notificación igual queda guardada y la ve en la campanita.
+ *
+ * El push respeta los interruptores del usuario (NotificationChannels): solo se consultan a
+ * security-service si tiene celulares registrados, y si no responde se envía igual.
  */
 @Service
 public class NotificationSendingService implements SendNotificationUseCase {
@@ -30,14 +34,17 @@ public class NotificationSendingService implements SendNotificationUseCase {
     private final DeviceTokenRepository devices;
     private final PushSender pushSender;
     private final EmailSender emailSender;
+    private final UserContactDirectory contacts;
     private final Clock clock;
 
     public NotificationSendingService(NotificationRepository notifications, DeviceTokenRepository devices,
-                                      PushSender pushSender, EmailSender emailSender, Clock clock) {
+                                      PushSender pushSender, EmailSender emailSender,
+                                      UserContactDirectory contacts, Clock clock) {
         this.notifications = notifications;
         this.devices = devices;
         this.pushSender = pushSender;
         this.emailSender = emailSender;
+        this.contacts = contacts;
         this.clock = clock;
     }
 
@@ -49,8 +56,10 @@ public class NotificationSendingService implements SendNotificationUseCase {
                 clock.instant()));
 
         List<DeviceToken> targets = devices.findActiveByUser(saved.userId());
-        if (!targets.isEmpty()) {
+        if (!targets.isEmpty() && wantsPush(saved)) {
             pushSender.send(saved, targets);
+        } else {
+            targets = List.of();
         }
         if (command.hasEmail()) {
             emailSender.send(saved, command.email().strip(), command.recipientName());
@@ -64,5 +73,12 @@ public class NotificationSendingService implements SendNotificationUseCase {
     @Transactional
     public List<Notification> sendAll(List<SendNotificationCommand> commands) {
         return commands.stream().map(this::send).toList();
+    }
+
+    // sin respuesta de security-service se envía: es mejor avisar de más que dejar de avisar
+    private boolean wantsPush(Notification notification) {
+        return contacts.contactOf(notification.userId())
+                .map(contact -> NotificationChannels.wantsPush(contact, notification.type()))
+                .orElse(true);
     }
 }

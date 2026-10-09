@@ -46,7 +46,7 @@ class BookingReminderServiceTest {
     private BookingReminderService at(String now) {
         Clock clock = Clock.fixed(Instant.parse(now), ZoneOffset.UTC);
         sender = new NotificationSendingService(notifications, new InMemoryDevices(), new RecordingPushSender(),
-                email, clock);
+                email, contacts, clock);
         return new BookingReminderService(reminders, sender, SETTINGS, new EmailRecipients(contacts), clock);
     }
 
