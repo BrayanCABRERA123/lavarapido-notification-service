@@ -162,6 +162,59 @@ class NotificationFactoryTest {
     }
 
     @Test
+    @DisplayName("LoyaltyPointsEarned avisa los puntos ganados y un cupón canjeable por cada promoción desbloqueada")
+    void pointsEarnedWithUnlockedCoupons() {
+        // mismo payload que publica payment-service (LoyaltyIntegrationEvents)
+        List<SendNotificationCommand> commands = factory.from(event("LoyaltyPointsEarned", Map.of(
+                "customerUserId", 7, "bookingId", 145, "bookingCode", "RES-000145", "points", 25, "balance", 40,
+                "unlockedPromotions", List.of(
+                        Map.of("code", "LAVA20", "name", "Lavado 20%", "discountPercent", 20, "requiredPoints", 30),
+                        Map.of("code", "VIP10", "name", "Cliente VIP", "discountPercent", 10, "requiredPoints", 40)))));
+
+        assertEquals(3, commands.size());
+        SendNotificationCommand points = commands.getFirst();
+        assertEquals(NotificationTypeCode.LOYALTY_POINTS_EARNED, points.type());
+        assertEquals("Ganaste 25 puntos", points.title());
+        assertTrue(points.message().contains("RES-000145"), points.message());
+        assertTrue(points.message().contains("Ahora tienes 40 puntos"), points.message());
+        assertEquals("booking", points.referenceEntity());
+
+        SendNotificationCommand coupon = commands.get(1);
+        assertEquals(NotificationTypeCode.PROMOTION_AVAILABLE, coupon.type());
+        assertEquals(7, coupon.userId());
+        assertEquals("¡Tienes un cupón canjeable!", coupon.title());
+        assertTrue(coupon.message().contains("«Lavado 20%»: 20% de descuento"), coupon.message());
+        assertTrue(coupon.message().contains("Usa el código LAVA20"), coupon.message());
+        assertEquals("VIP10", commands.get(2).message().replaceAll(".*código (\\w+).*", "$1"));
+    }
+
+    @Test
+    @DisplayName("LoyaltyPointsEarned sin cupones desbloqueados solo avisa los puntos; sin puntos no avisa nada")
+    void pointsEarnedWithoutCoupons() {
+        List<SendNotificationCommand> commands = factory.from(event("LoyaltyPointsEarned", Map.of(
+                "customerUserId", 7, "bookingId", 145, "points", 1, "balance", 1, "unlockedPromotions", List.of())));
+
+        assertEquals(1, commands.size());
+        assertEquals("Ganaste 1 punto", commands.getFirst().title());
+        assertTrue(factory.from(event("LoyaltyPointsEarned", Map.of("customerUserId", 7, "points", 0))).isEmpty());
+    }
+
+    @Test
+    @DisplayName("PaymentRefunded avisa al cliente que se le devolvió el pago, con el monto")
+    void refundsPayment() {
+        // mismo payload que publica payment-service (PaymentIntegrationEvents)
+        SendNotificationCommand command = factory.from(event("PaymentRefunded", Map.of(
+                "paymentId", 90, "bookingId", 145, "customerUserId", 7, "amount", 45000))).getFirst();
+
+        assertEquals(7, command.userId());
+        assertEquals(NotificationTypeCode.PAYMENT_REFUNDED, command.type());
+        assertEquals("Pago reembolsado", command.title());
+        assertEquals("payment", command.referenceEntity());
+        assertEquals(90L, command.referenceId());
+        assertTrue(command.message().contains("$45.000"), command.message());
+    }
+
+    @Test
     @DisplayName("sin el user_id del destinatario no se crea notificación")
     void skipsWithoutRecipient() {
         assertTrue(factory.from(event("BookingCreated", Map.of("bookingId", 145))).isEmpty());

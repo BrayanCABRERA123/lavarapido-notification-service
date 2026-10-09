@@ -91,15 +91,66 @@ public final class EventNotificationFactory {
                     "Pago rechazado",
                     "No pudimos aprobar tu pago" + amount(p) + "." + reason(p) + " Puedes intentarlo de nuevo.",
                     PAYMENT, id(p, "paymentId"));
+            case "PaymentRefunded" -> add(commands, userId(p, "customerUserId"), NotificationTypeCode.PAYMENT_REFUNDED,
+                    "Pago reembolsado",
+                    "Reembolsamos tu pago" + amount(p) + ". Si tienes dudas, comunícate con el lavadero.",
+                    PAYMENT, id(p, "paymentId"));
             case "PromotionRedeemed" -> add(commands, userId(p, "customerUserId"), NotificationTypeCode.PROMOTION_REDEEMED,
                     "Cupón canjeado: " + promotionName(p),
                     "Canjeaste el cupón " + promotionName(p) + " en tu reserva" + bookingCode(p) + discountAmount(p) + ".",
                     BOOKING, id(p, "bookingId"));
+            case "LoyaltyPointsEarned" -> pointsEarned(commands, p);
             default -> {
                 // eventos que no generan notificación (UserAuthenticated, RatingSubmitted...)
             }
         }
         return commands;
+    }
+
+    /**
+     * Puntos que ganó una reserva pagada (payment.loyalty_points_earned) y, por cada promoción que
+     * esos puntos desbloquearon, un aviso de cupón canjeable con el código para usarlo al pagar.
+     */
+    private static void pointsEarned(List<SendNotificationCommand> commands, Map<String, Object> p) {
+        Long user = userId(p, "customerUserId");
+        Long points = id(p, "points");
+        if (user == null || points == null || points <= 0) {
+            return;
+        }
+        Long balance = id(p, "balance");
+        add(commands, user, NotificationTypeCode.LOYALTY_POINTS_EARNED,
+                "Ganaste " + pointsText(points),
+                "Tu reserva" + bookingCode(p) + " te dio " + pointsText(points) + " de fidelización."
+                        + (balance == null ? "" : " Ahora tienes " + pointsText(balance) + "."),
+                BOOKING, id(p, "bookingId"));
+
+        for (Map<String, Object> promotion : maps(p.get("unlockedPromotions"))) {
+            String code = text(promotion, "code");
+            if (code == null) {
+                continue;
+            }
+            String name = text(promotion, "name");
+            Long percent = id(promotion, "discountPercent");
+            add(commands, user, NotificationTypeCode.PROMOTION_AVAILABLE,
+                    "¡Tienes un cupón canjeable!",
+                    "Con tus puntos desbloqueaste " + (name == null ? "una promoción" : "«" + name + "»")
+                            + (percent == null || percent <= 0 ? "" : ": " + percent + "% de descuento")
+                            + ". Usa el código " + code + " al pagar tu próxima reserva.",
+                    null, null);
+        }
+    }
+
+    private static String pointsText(long points) {
+        return points == 1 ? "1 punto" : points + " puntos";
+    }
+
+    // lista de objetos JSON del payload (ej. unlockedPromotions); lo que no sea un objeto se ignora
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> maps(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        return list.stream().filter(Map.class::isInstance).map(item -> (Map<String, Object>) item).toList();
     }
 
     private static void add(List<SendNotificationCommand> commands, Long userId, NotificationTypeCode type,
