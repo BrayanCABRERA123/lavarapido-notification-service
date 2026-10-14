@@ -9,6 +9,8 @@ import com.lavarapido.notification.domain.port.out.EmailSender;
 import com.lavarapido.notification.domain.port.out.NotificationRepository;
 import com.lavarapido.notification.domain.port.out.PushSender;
 import com.lavarapido.notification.domain.port.out.UserContactDirectory;
+import com.lavarapido.notification.domain.port.out.UserContactDirectory.UserContact;
+import com.lavarapido.notification.domain.service.NotificationTexts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Guarda la notificación en la bandeja, la manda por push a los celulares del usuario y, si el
@@ -36,6 +39,7 @@ public class NotificationSendingService implements SendNotificationUseCase {
     private final EmailSender emailSender;
     private final UserContactDirectory contacts;
     private final Clock clock;
+    private final NotificationTexts texts = NotificationTexts.defaults();
 
     public NotificationSendingService(NotificationRepository notifications, DeviceTokenRepository devices,
                                       PushSender pushSender, EmailSender emailSender,
@@ -51,18 +55,24 @@ public class NotificationSendingService implements SendNotificationUseCase {
     @Override
     @Transactional
     public Notification send(SendNotificationCommand command) {
-        Notification saved = notifications.save(Notification.create(command.userId(), command.type(),
-                command.title(), command.message(), command.referenceEntity(), command.referenceId(),
+        // el aviso se escribe en el idioma de la cuenta de quien lo recibe (RF-020); un mensaje escrito
+        // a mano por el administrador no trae plantilla y sale tal cual
+        boolean contactRead = command.isLocalized();
+        Optional<UserContact> contact = contactRead ? contacts.contactOf(command.userId()) : Optional.empty();
+        String language = NotificationTexts.language(contact.map(UserContact::language).orElse(null));
+        SendNotificationCommand localized = command.in(language, texts);
+        Notification saved = notifications.save(Notification.create(localized.userId(), localized.type(),
+                localized.title(), localized.message(), localized.referenceEntity(), localized.referenceId(),
                 clock.instant()));
 
         List<DeviceToken> targets = devices.findActiveByUser(saved.userId());
-        if (!targets.isEmpty() && wantsPush(saved)) {
+        if (!targets.isEmpty() && wantsPush(saved, contactRead ? contact : contacts.contactOf(saved.userId()))) {
             pushSender.send(saved, targets);
         } else {
             targets = List.of();
         }
-        if (command.hasEmail()) {
-            emailSender.send(saved, command.email().strip(), command.recipientName());
+        if (localized.hasEmail()) {
+            emailSender.send(saved, localized.email().strip(), localized.recipientName(), language);
         }
         log.info("Notification {} ({}) created for user {}, push to {} device(s)",
                 saved.notificationId(), saved.type(), saved.userId(), targets.size());
@@ -76,9 +86,7 @@ public class NotificationSendingService implements SendNotificationUseCase {
     }
 
     // sin respuesta de security-service se envía: es mejor avisar de más que dejar de avisar
-    private boolean wantsPush(Notification notification) {
-        return contacts.contactOf(notification.userId())
-                .map(contact -> NotificationChannels.wantsPush(contact, notification.type()))
-                .orElse(true);
+    private boolean wantsPush(Notification notification, Optional<UserContact> contact) {
+        return contact.map(c -> NotificationChannels.wantsPush(c, notification.type())).orElse(true);
     }
 }

@@ -52,9 +52,7 @@ public class EmailRecipients {
                 .filter(contact -> contact.email() != null && !contact.email().isBlank())
                 // el usuario pudo apagar el correo de recordatorios o las promociones
                 .filter(contact -> NotificationChannels.wantsEmail(contact, command.type()))
-                .map(contact -> new SendNotificationCommand(command.userId(), command.type(), command.title(),
-                        command.message(), command.referenceEntity(), command.referenceId(), contact.email(),
-                        contact.firstName()))
+                .map(contact -> command.withEmail(contact.email(), contact.firstName()))
                 .orElse(command);
     }
 }

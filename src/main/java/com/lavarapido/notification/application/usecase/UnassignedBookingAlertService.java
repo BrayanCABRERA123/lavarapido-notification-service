@@ -1,5 +1,6 @@
 package com.lavarapido.notification.application.usecase;
 
+import com.lavarapido.notification.domain.model.LocalizedText;
 import com.lavarapido.notification.domain.model.NotificationTypeCode;
 import com.lavarapido.notification.domain.model.TrackedBooking;
 import com.lavarapido.notification.domain.port.in.SendNotificationCommand;
@@ -16,8 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -34,8 +33,6 @@ import java.util.List;
 public class UnassignedBookingAlertService implements UnassignedBookingAlertUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(UnassignedBookingAlertService.class);
-    private static final ZoneId COLOMBIA = ZoneId.of("America/Bogota");
-    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
     // también se avisa la que ya empezó sin operario, pero no las viejas (para no llenar la bandeja)
     private static final Duration ALREADY_STARTED = Duration.ofHours(1);
 
@@ -71,13 +68,12 @@ public class UnassignedBookingAlertService implements UnassignedBookingAlertUseC
         int sent = 0;
         for (TrackedBooking booking : due) {
             String code = booking.bookingCode() == null ? "#" + booking.bookingId() : booking.bookingCode();
-            String when = DATE_TIME.format(booking.scheduledStart().atZone(COLOMBIA));
+            LocalizedText message = LocalizedText.of(booking.scheduledStart().isAfter(now)
+                            ? "admin.unassigned.upcoming" : "admin.unassigned.started")
+                    .with("code", code).with("when", booking.scheduledStart());
             List<SendNotificationCommand> commands = admins.stream()
-                    .map(admin -> new SendNotificationCommand(admin, NotificationTypeCode.ADMIN_BOOKING_UNASSIGNED,
-                            "Reserva sin operario",
-                            "La reserva " + code + (booking.scheduledStart().isAfter(now) ? " es el " : " ya debía empezar: era el ")
-                                    + when + " y todavía no tiene operario asignado. Asígnalo desde Reservas.",
-                            "booking", booking.bookingId()))
+                    .map(admin -> SendNotificationCommand.localized(admin, NotificationTypeCode.ADMIN_BOOKING_UNASSIGNED,
+                            LocalizedText.of("admin.unassigned.title"), message, "booking", booking.bookingId()))
                     .toList();
             sender.sendAll(commands);
             tracking.markUnassignedAlertSent(booking.bookingId(), now);

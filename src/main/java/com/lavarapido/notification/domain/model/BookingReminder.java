@@ -1,11 +1,10 @@
 package com.lavarapido.notification.domain.model;
 
 import com.lavarapido.notification.domain.exception.InvalidValueException;
+import com.lavarapido.notification.domain.service.NotificationTexts;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,9 +17,6 @@ import java.util.List;
  */
 public record BookingReminder(Long id, long bookingId, long userId, String bookingCode, Instant scheduledStart,
                               int leadMinutes, Instant remindAt, Instant sentAt) {
-
-    private static final ZoneId COLOMBIA = ZoneId.of("America/Bogota");
-    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
 
     public BookingReminder {
         if (bookingId <= 0 || userId <= 0) {
@@ -53,13 +49,22 @@ public record BookingReminder(Long id, long bookingId, long userId, String booki
         return !scheduledStart.isAfter(now);
     }
 
+    /** Plantillas del aviso (NotificationTexts): se escribe en el idioma de la cuenta del cliente. */
+    public LocalizedText titleText() {
+        return LocalizedText.of("reminder.title");
+    }
+
+    public LocalizedText messageText() {
+        String code = bookingCode == null || bookingCode.isBlank() ? "" : " " + bookingCode;
+        return LocalizedText.of("reminder.message").with("code", code).with("when", scheduledStart);
+    }
+
+    /** El aviso en español, el idioma por defecto. */
     public String title() {
-        return "Recordatorio de tu lavado";
+        return NotificationTexts.defaults().render(titleText(), NotificationTexts.DEFAULT_LANGUAGE);
     }
 
     public String message() {
-        String code = bookingCode == null || bookingCode.isBlank() ? "" : " " + bookingCode;
-        return "Tu reserva" + code + " es el " + DATE_TIME.format(scheduledStart.atZone(COLOMBIA))
-                + ". Te esperamos en la sede.";
+        return NotificationTexts.defaults().render(messageText(), NotificationTexts.DEFAULT_LANGUAGE);
     }
 }
