@@ -9,4 +9,9 @@ import com.lavarapido.notification.domain.model.Notification;
 public interface EmailSender {
 
     void send(Notification notification, String toAddress, String recipientName);
+
+    /** Con el saludo y el pie del correo en el idioma de la cuenta (es, en, fr, pt). */
+    default void send(Notification notification, String toAddress, String recipientName, String language) {
+        send(notification, toAddress, recipientName);
+    }
 }

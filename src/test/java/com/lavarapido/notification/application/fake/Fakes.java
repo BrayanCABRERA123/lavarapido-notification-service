@@ -268,6 +268,14 @@ public final class Fakes {
             return this;
         }
 
+        /** Idioma de la cuenta (es, en, fr, pt): los avisos se escriben en ese idioma. */
+        public InMemoryContacts withLanguage(long userId, String language) {
+            UserContact c = contacts.getOrDefault(userId, new UserContact(userId, null, null, true, null, null, null));
+            contacts.put(userId, new UserContact(userId, c.email(), c.firstName(), c.active(), c.pushEnabled(),
+                    c.emailRemindersEnabled(), c.promotionsEnabled(), language));
+            return this;
+        }
+
         public InMemoryContacts withAdmins(Long... ids) {
             admins.addAll(List.of(ids));
             return this;

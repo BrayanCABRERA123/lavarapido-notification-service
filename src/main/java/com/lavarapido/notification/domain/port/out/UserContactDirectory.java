@@ -19,10 +19,17 @@ public interface UserContactDirectory {
     /**
      * Contacto del usuario y por qué canales quiere sus avisos (Configuración > Notificaciones en
      * security-service). Los canales llegan null si security-service todavía no los manda: se toman
-     * como activos para no dejar de avisar por un dato que falta.
+     * como activos para no dejar de avisar por un dato que falta. language es el idioma de la cuenta
+     * (es, en, fr, pt): los avisos se escriben en ese idioma (RF-020).
      */
     record UserContact(long userId, String email, String firstName, boolean active, Boolean pushEnabled,
-                       Boolean emailRemindersEnabled, Boolean promotionsEnabled) {
+                       Boolean emailRemindersEnabled, Boolean promotionsEnabled, String language) {
+
+        /** Sin idioma (security-service que todavía no lo manda): los avisos salen en español. */
+        public UserContact(long userId, String email, String firstName, boolean active, Boolean pushEnabled,
+                           Boolean emailRemindersEnabled, Boolean promotionsEnabled) {
+            this(userId, email, firstName, active, pushEnabled, emailRemindersEnabled, promotionsEnabled, null);
+        }
 
         public boolean allowsPush() {
             return !Boolean.FALSE.equals(pushEnabled);

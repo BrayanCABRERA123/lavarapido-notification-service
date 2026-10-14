@@ -1,7 +1,9 @@
 package com.lavarapido.notification.infrastructure.adapter.out.email;
 
 import com.lavarapido.notification.domain.model.Notification;
+import com.lavarapido.notification.domain.model.LocalizedText;
 import com.lavarapido.notification.domain.port.out.EmailSender;
+import com.lavarapido.notification.domain.service.NotificationTexts;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
@@ -29,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 class SmtpEmailSender implements EmailSender {
 
     private static final Logger log = LoggerFactory.getLogger(SmtpEmailSender.class);
+    private static final NotificationTexts TEXTS = NotificationTexts.defaults();
 
     private final JavaMailSender mailSender;
     private final String from;
@@ -41,14 +44,21 @@ class SmtpEmailSender implements EmailSender {
     @Async
     @Override
     public void send(Notification notification, String toAddress, String recipientName) {
+        send(notification, toAddress, recipientName, NotificationTexts.DEFAULT_LANGUAGE);
+    }
+
+    /** El título y el mensaje ya vienen en el idioma de la cuenta; aquí se escriben el saludo y el pie. */
+    @Async
+    @Override
+    public void send(Notification notification, String toAddress, String recipientName, String language) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
             helper.setFrom(from);
             helper.setTo(toAddress);
-            helper.setSubject(notification.title() + " — LavaRápido");
+            helper.setSubject(TEXTS.render(LocalizedText.of("email.subject").with("title", notification.title()), language));
             // texto plano + HTML: los clientes de correo que no muestran HTML igual lo leen
-            helper.setText(plainText(notification, recipientName), html(notification, recipientName));
+            helper.setText(plainText(notification, recipientName, language), html(notification, recipientName, language));
             mailSender.send(message);
             log.info("Email for notification {} ({}) sent", notification.notificationId(), notification.type());
         } catch (MessagingException | MailException exception) {
@@ -57,18 +67,19 @@ class SmtpEmailSender implements EmailSender {
         }
     }
 
-    static String plainText(Notification notification, String recipientName) {
+    static String plainText(Notification notification, String recipientName, String language) {
         return """
                 %s
 
                 %s
 
                 —
-                LavaRápido · Este correo se envió automáticamente, no es necesario responderlo.
-                """.formatted(greeting(recipientName), notification.message());
+                %s
+                """.formatted(greeting(recipientName, language), notification.message(),
+                TEXTS.render(LocalizedText.of("email.footer"), language));
     }
 
-    static String html(Notification notification, String recipientName) {
+    static String html(Notification notification, String recipientName, String language) {
         return """
                 <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#1a1a2e">
                   <div style="background:#2ec4b6;color:#ffffff;padding:20px 24px;border-radius:12px 12px 0 0">
@@ -78,16 +89,19 @@ class SmtpEmailSender implements EmailSender {
                     <p style="margin:0 0 12px">%s</p>
                     <p style="margin:0 0 20px;line-height:1.5">%s</p>
                     <p style="margin:0;font-size:12px;color:#9aa5ab">
-                      LavaRápido · Este correo se envió automáticamente, no es necesario responderlo.
+                      %s
                     </p>
                   </div>
                 </div>
                 """.formatted(HtmlUtils.htmlEscape(notification.title()),
-                HtmlUtils.htmlEscape(greeting(recipientName)),
-                HtmlUtils.htmlEscape(notification.message()));
+                HtmlUtils.htmlEscape(greeting(recipientName, language)),
+                HtmlUtils.htmlEscape(notification.message()),
+                HtmlUtils.htmlEscape(TEXTS.render(LocalizedText.of("email.footer"), language)));
     }
 
-    private static String greeting(String recipientName) {
-        return recipientName == null || recipientName.isBlank() ? "Hola," : "Hola, " + recipientName.strip() + ":";
+    private static String greeting(String recipientName, String language) {
+        return recipientName == null || recipientName.isBlank()
+                ? TEXTS.render(LocalizedText.of("email.greeting"), language)
+                : TEXTS.render(LocalizedText.of("email.greetingName").with("name", recipientName.strip()), language);
     }
 }

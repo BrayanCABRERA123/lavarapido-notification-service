@@ -72,8 +72,8 @@ public class BookingReminderService implements BookingReminderUseCase {
         int sent = 0;
         for (BookingReminder reminder : reminders.findDue(now, settings.batchSize())) {
             if (!reminder.isStale(now)) {
-                sender.send(emailRecipients.withEmail(new SendNotificationCommand(reminder.userId(),
-                        NotificationTypeCode.BOOKING_REMINDER, reminder.title(), reminder.message(), BOOKING,
+                sender.send(emailRecipients.withEmail(SendNotificationCommand.localized(reminder.userId(),
+                        NotificationTypeCode.BOOKING_REMINDER, reminder.titleText(), reminder.messageText(), BOOKING,
                         reminder.bookingId())));
                 sent++;
             }
