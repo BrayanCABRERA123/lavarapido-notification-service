@@ -237,4 +237,32 @@ class NotificationFactoryTest {
         assertTrue(factory.from(event("RatingSubmitted", Map.of("customerUserId", 7))).isEmpty());
         assertTrue(factory.from(event(null, Map.of())).isEmpty());
     }
+
+    @Test
+    void inspectionSharedTellsTheClientWithTheSummaryAndThePublicLink() {
+        EventNotificationFactory withWeb = new EventNotificationFactory("https://lavarapido.co/");
+        var commands = withWeb.from(event("InspectionShared", Map.of(
+                "bookingId", 7, "bookingCode", "RES-000007", "customerUserId", 10002, "plate", "ABC-123",
+                "publicToken", "tok123", "phasesDone", 3, "phasesTotal", 5, "findings", 2, "majorFindings", 1,
+                "areas", List.of("Puerta trasera", "Silla"))));
+
+        assertEquals(1, commands.size());
+        var command = commands.get(0);
+        assertEquals(NotificationTypeCode.INSPECTION_REPORT, command.type());
+        assertEquals(10002L, command.userId());
+        assertTrue(command.message().contains("Fases terminadas: 3 de 5."), command.message());
+        assertTrue(command.message().contains("Hallazgos: 2 (importantes: 1): Puerta trasera, Silla."), command.message());
+        assertTrue(command.message().endsWith("https://lavarapido.co/report/tok123"), command.message());
+    }
+
+    @Test
+    void longInspectionAreasAreShortenedButTheLinkStays() {
+        List<String> areas = java.util.Collections.nCopies(60, "Guardabarros delantero");
+        var command = factory.from(event("InspectionShared", Map.of(
+                "bookingId", 7, "customerUserId", 10002, "publicToken", "tok123", "phasesDone", 5, "phasesTotal", 5,
+                "findings", 60, "majorFindings", 0, "areas", areas))).get(0);
+
+        assertTrue(command.message().length() <= 500, String.valueOf(command.message().length()));
+        assertTrue(command.message().endsWith("/report/tok123"), command.message());
+    }
 }

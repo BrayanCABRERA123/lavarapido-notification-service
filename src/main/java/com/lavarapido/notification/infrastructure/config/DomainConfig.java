@@ -29,8 +29,8 @@ class DomainConfig {
     }
 
     @Bean
-    EventNotificationFactory eventNotificationFactory() {
-        return new EventNotificationFactory();
+    EventNotificationFactory eventNotificationFactory(@Value("${app.web-url:http://localhost:4200}") String webUrl) {
+        return new EventNotificationFactory(webUrl);
     }
 
     @Bean

@@ -29,6 +29,18 @@ public final class EventNotificationFactory {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm");
     private static final String BOOKING = "booking";
     private static final String PAYMENT = "payment";
+    private static final int MAX_MESSAGE = 500;
+
+    /** Dirección de la web: el aviso del informe de inspección lleva el enlace público. */
+    private final String webUrl;
+
+    public EventNotificationFactory() {
+        this("http://localhost:4200");
+    }
+
+    public EventNotificationFactory(String webUrl) {
+        this.webUrl = webUrl == null ? "" : webUrl.replaceAll("/+$", "");
+    }
 
     /** Lista vacía = el evento no genera notificaciones (o le faltan datos para hacerlo). */
     public List<SendNotificationCommand> from(DomainEventEnvelope event) {
@@ -100,6 +112,8 @@ public final class EventNotificationFactory {
                     "Canjeaste el cupón " + promotionName(p) + " en tu reserva" + bookingCode(p) + discountAmount(p) + ".",
                     BOOKING, id(p, "bookingId"));
             case "LoyaltyPointsEarned" -> pointsEarned(commands, p);
+            case "InspectionShared" -> add(commands, userId(p, "customerUserId"), NotificationTypeCode.INSPECTION_REPORT,
+                    "Reporte de inspección de tu vehículo", inspectionMessage(p), BOOKING, id(p, "bookingId"));
             default -> {
                 // eventos que no generan notificación (UserAuthenticated, RatingSubmitted...)
             }
@@ -138,6 +152,49 @@ public final class EventNotificationFactory {
                             + ". Usa el código " + code + " al pagar tu próxima reserva.",
                     null, null);
         }
+    }
+
+    /**
+     * Resumen del informe que el admin compartió (execution.inspection_shared) con el enlace público.
+     * El enlace va al final y nunca se recorta: si el mensaje no cabe, se acortan las partes revisadas.
+     */
+    private String inspectionMessage(Map<String, Object> p) {
+        String plate = text(p, "plate");
+        Long done = id(p, "phasesDone");
+        Long total = id(p, "phasesTotal");
+        Long findings = id(p, "findings");
+        Long major = id(p, "majorFindings");
+        String token = text(p, "publicToken");
+        String link = token == null ? "" : " Míralo con las fotos aquí: " + webUrl + "/report/" + token;
+        String start = "Este es el reporte de inspección de tu vehículo" + (plate == null ? "" : " " + plate)
+                + bookingCodeInParentheses(p) + "."
+                + (done == null || total == null ? "" : " Fases terminadas: " + done + " de " + total + ".");
+        String body;
+        if (findings == null || findings == 0) {
+            body = " No encontramos novedades.";
+        } else {
+            String areas = String.join(", ", strings(p.get("areas")));
+            body = " Hallazgos: " + findings + (major == null || major == 0 ? "" : " (importantes: " + major + ")")
+                    + (areas.isEmpty() ? "." : ": " + areas + ".");
+        }
+        int room = MAX_MESSAGE - start.length() - link.length();
+        if (body.length() > room) {
+            body = body.substring(0, Math.max(0, room - 3)) + "...";
+        }
+        return start + body + link;
+    }
+
+    private static String bookingCodeInParentheses(Map<String, Object> payload) {
+        String code = text(payload, "bookingCode");
+        return code == null ? "" : " (reserva " + code + ")";
+    }
+
+    private static List<String> strings(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        return list.stream().filter(String.class::isInstance).map(String.class::cast).map(String::strip)
+                .filter(s -> !s.isEmpty()).toList();
     }
 
     private static String pointsText(long points) {
