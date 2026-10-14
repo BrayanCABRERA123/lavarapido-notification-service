@@ -116,6 +116,8 @@ app:
     leads: ${REMINDER_LEADS:24h,1h}
     # cada cuánto se revisan los recordatorios vencidos
     check-interval: ${REMINDER_CHECK_INTERVAL:5m}
+    # aviso a los administradores: reserva que empieza en menos de esto y sigue sin operario
+    unassigned-lead: ${REMINDER_UNASSIGNED_LEAD:2h}
     initial-delay: 30s
     batch-size: 100
 

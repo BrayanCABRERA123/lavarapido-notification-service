@@ -37,7 +37,9 @@ public enum NotificationTypeCode {
     OPERATOR_SERVICE_UNASSIGNED(NotificationCategory.CANCELLATION),
     ADMIN_BOOKING_CREATED(NotificationCategory.CONFIRMATION),
     ADMIN_BOOKING_RESCHEDULED(NotificationCategory.MESSAGE),
-    ADMIN_BOOKING_CANCELLED(NotificationCategory.CANCELLATION);
+    ADMIN_BOOKING_CANCELLED(NotificationCategory.CANCELLATION),
+    // reserva confirmada que empieza en menos de 2 horas y sigue sin operario (migración 031)
+    ADMIN_BOOKING_UNASSIGNED(NotificationCategory.MESSAGE);
 
     private final NotificationCategory category;
 

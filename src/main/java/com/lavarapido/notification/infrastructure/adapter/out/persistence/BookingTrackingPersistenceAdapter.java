@@ -1,5 +1,7 @@
 package com.lavarapido.notification.infrastructure.adapter.out.persistence;
 
+import java.time.Instant;
+import java.util.List;
 import com.lavarapido.notification.domain.model.TrackedBooking;
 import com.lavarapido.notification.domain.port.out.BookingTrackingRepository;
 import com.lavarapido.notification.infrastructure.adapter.out.persistence.entity.BookingTrackingJpaEntity;
@@ -22,8 +24,26 @@ class BookingTrackingPersistenceAdapter implements BookingTrackingRepository {
 
     @Override
     public Optional<TrackedBooking> find(long bookingId) {
-        return bookings.findById(bookingId).map(row -> new TrackedBooking(row.getBookingId(), row.getBookingCode(),
-                row.getCustomerUserId(), row.getOperatorUserId(), row.getScheduledStart(), row.isCancelled()));
+        return bookings.findById(bookingId).map(BookingTrackingPersistenceAdapter::toDomain);
+    }
+
+    @Override
+    public List<TrackedBooking> findUnassignedStartingBetween(Instant from, Instant to) {
+        return bookings.findByOperatorUserIdIsNullAndCancelledFalseAndUnassignedAlertAtIsNullAndScheduledStartBetween(from, to)
+                .stream().map(BookingTrackingPersistenceAdapter::toDomain).toList();
+    }
+
+    @Override
+    public void markUnassignedAlertSent(long bookingId, Instant at) {
+        bookings.findById(bookingId).ifPresent(row -> {
+            row.setUnassignedAlertAt(at);
+            bookings.save(row);
+        });
+    }
+
+    private static TrackedBooking toDomain(BookingTrackingJpaEntity row) {
+        return new TrackedBooking(row.getBookingId(), row.getBookingCode(), row.getCustomerUserId(),
+                row.getOperatorUserId(), row.getScheduledStart(), row.isCancelled());
     }
 
     @Override

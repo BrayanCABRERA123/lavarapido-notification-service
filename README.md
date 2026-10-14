@@ -79,6 +79,12 @@ Con `booking.confirmed` se programan recordatorios 24 h y 1 h antes de la cita (
 reprogramada los mueve a la nueva hora. Una tarea programada los envía a la bandeja
 (pestaña "Recordatorios"), por push y por correo.
 
+La misma tarea avisa a los administradores (bandeja y push) cuando una reserva confirmada empieza en
+menos de 2 horas (`REMINDER_UNASSIGNED_LEAD`, por defecto `2h`), o ya debía empezar hace menos de una
+hora, y todavía no tiene operario:
+"Reserva sin operario". Cada reserva se avisa una vez; si la reprograman, se vuelve a avisar antes de
+la hora nueva (migración 031).
+
 ## Correo de reservas y recordatorios
 
 Las notificaciones de reserva (creada, confirmada, cancelada) y los recordatorios también van por
