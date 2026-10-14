@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Convierte los eventos de los otros servicios en notificaciones y, con los de reserva, programa
@@ -29,6 +30,8 @@ public class DomainEventConsumerService implements ConsumeDomainEventUseCase {
     private static final Logger log = LoggerFactory.getLogger(DomainEventConsumerService.class);
     private static final String BOOKING_CONFIRMED = "BookingConfirmed";
     private static final String BOOKING_CANCELLED = "BookingCancelled";
+    // si el servicio ya empezó o terminó, los recordatorios que falten ya no tienen sentido
+    private static final Set<String> STOP_REMINDERS = Set.of(BOOKING_CANCELLED, "ServiceStarted", "ServiceCompleted");
 
     private final ProcessedEventRepository processedEvents;
     private final SendNotificationUseCase sender;
@@ -71,14 +74,14 @@ public class DomainEventConsumerService implements ConsumeDomainEventUseCase {
                 commands.size(), staffNotifications);
     }
 
-    /** Una reserva confirmada (o reprogramada) programa recordatorios; una cancelada los quita. */
+    /** Una reserva confirmada (o reprogramada) programa recordatorios; cancelada, iniciada o terminada los quita. */
     private void updateReminders(DomainEventEnvelope event) {
         if (BOOKING_CONFIRMED.equals(event.eventType())) {
             BookingEventPayload.from(event)
                     .filter(BookingEventPayload::canBeReminded)
                     .ifPresent(booking -> reminders.schedule(booking.bookingId(), booking.customerUserId(),
                             booking.bookingCode(), booking.scheduledStart()));
-        } else if (BOOKING_CANCELLED.equals(event.eventType())) {
+        } else if (STOP_REMINDERS.contains(event.eventType())) {
             BookingEventPayload.from(event).ifPresent(booking -> reminders.cancel(booking.bookingId()));
         }
     }

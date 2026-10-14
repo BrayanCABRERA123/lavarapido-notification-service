@@ -145,6 +145,22 @@ class BookingReminderServiceTest {
     }
 
     @Test
+    @DisplayName("si el servicio ya empezó, los recordatorios que faltan no se envían")
+    void startedServiceStopsReminders() {
+        BookingReminderService service = at("2026-09-29T12:00:00Z");
+        DomainEventConsumerService consumer = new DomainEventConsumerService(new InMemoryProcessedEvents(), sender,
+                new EventNotificationFactory(), service, new EmailRecipients(contacts),
+                new StaffNotificationService(new InMemoryBookingTracking(), contacts, new StaffNotificationFactory(), sender));
+
+        consumer.handle(new DomainEventEnvelope("evt-5", "BookingConfirmed", "1", Instant.parse("2026-09-29T12:00:00Z"), 1,
+                Map.of("bookingId", 1, "bookingCode", "RES-000001", "customerUserId", ANA, "scheduledStart", START)));
+        consumer.handle(new DomainEventEnvelope("evt-6", "ServiceStarted", "1", Instant.parse("2026-09-29T12:20:00Z"), 1,
+                Map.of("bookingId", 1, "bookingCode", "RES-000001", "customerUserId", ANA)));
+
+        assertTrue(reminders.pending().isEmpty());
+    }
+
+    @Test
     @DisplayName("un BookingConfirmed sin cliente o sin hora no programa nada (y no falla)")
     void incompleteEventIsIgnored() {
         BookingReminderService service = at("2026-09-29T12:00:00Z");
