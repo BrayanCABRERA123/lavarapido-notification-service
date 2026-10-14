@@ -42,6 +42,7 @@ class RabbitMessagingConfig {
             "execution.operator_assigned",
             "execution.service_started",
             "execution.service_completed",
+            "execution.inspection_shared",
             "payment.confirmed",
             "payment.rejected",
             "payment.refunded",
