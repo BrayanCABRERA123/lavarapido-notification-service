@@ -1,5 +1,6 @@
 package com.lavarapido.notification.infrastructure.adapter.in.scheduling;
 
+import com.lavarapido.notification.domain.port.in.UnassignedBookingAlertUseCase;
 import com.lavarapido.notification.domain.port.in.BookingReminderUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,9 +22,11 @@ class ReminderScheduler {
     private static final Logger log = LoggerFactory.getLogger(ReminderScheduler.class);
 
     private final BookingReminderUseCase reminders;
+    private final UnassignedBookingAlertUseCase unassigned;
 
-    ReminderScheduler(BookingReminderUseCase reminders) {
+    ReminderScheduler(BookingReminderUseCase reminders, UnassignedBookingAlertUseCase unassigned) {
         this.reminders = reminders;
+        this.unassigned = unassigned;
     }
 
     @Scheduled(fixedDelayString = "${app.reminders.check-interval:5m}", initialDelayString = "${app.reminders.initial-delay:30s}")
@@ -33,6 +36,12 @@ class ReminderScheduler {
         } catch (RuntimeException e) {
             // un fallo (base caída) no detiene la tarea: se reintenta en la siguiente vuelta
             log.error("Could not send the due booking reminders: {}", e.getMessage());
+        }
+        try {
+            // reservas que empiezan pronto y siguen sin operario: aviso a los administradores
+            unassigned.alertDue();
+        } catch (RuntimeException e) {
+            log.error("Could not alert the bookings without operator: {}", e.getMessage());
         }
     }
 }

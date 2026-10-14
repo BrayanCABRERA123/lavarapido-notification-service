@@ -34,6 +34,10 @@ public class BookingTrackingJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    // cuándo se avisó que seguía sin operario (migración 031); null = no se ha avisado
+    @Column(name = "unassigned_alert_at")
+    private Instant unassignedAlertAt;
+
     protected BookingTrackingJpaEntity() {
     }
 
@@ -70,5 +74,9 @@ public class BookingTrackingJpaEntity {
 
     public boolean isCancelled() {
         return cancelled;
+    }
+
+    public void setUnassignedAlertAt(Instant unassignedAlertAt) {
+        this.unassignedAlertAt = unassignedAlertAt;
     }
 }

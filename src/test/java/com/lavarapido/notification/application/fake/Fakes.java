@@ -293,9 +293,26 @@ public final class Fakes {
             return Optional.ofNullable(rows.get(bookingId));
         }
 
+        // reservas a las que ya se les avisó que seguían sin operario
+        public final Set<Long> unassignedAlerted = new HashSet<>();
+
         @Override
         public void save(TrackedBooking booking) {
             rows.put(booking.bookingId(), booking);
+            unassignedAlerted.remove(booking.bookingId());
+        }
+
+        @Override
+        public List<TrackedBooking> findUnassignedStartingBetween(Instant from, Instant to) {
+            return rows.values().stream()
+                    .filter(b -> b.operatorUserId() == null && !b.cancelled() && !unassignedAlerted.contains(b.bookingId()))
+                    .filter(b -> b.scheduledStart() != null && !b.scheduledStart().isBefore(from) && !b.scheduledStart().isAfter(to))
+                    .toList();
+        }
+
+        @Override
+        public void markUnassignedAlertSent(long bookingId, Instant at) {
+            unassignedAlerted.add(bookingId);
         }
     }
 }
