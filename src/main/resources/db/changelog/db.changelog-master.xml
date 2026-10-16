@@ -29,5 +29,6 @@
     <include file="db/changelog/028-notification-payment-refunded-type.sql"/>
     <include file="db/changelog/029-notification-loyalty-and-inspection-types.sql"/>
     <include file="db/changelog/031-notification-unassigned-booking-alert.sql"/>
+    <include file="db/changelog/038-notification-app-update-type.sql"/>
 
 </databaseChangeLog>
