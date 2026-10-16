@@ -124,6 +124,11 @@ public final class Fakes {
         }
 
         @Override
+        public List<Long> usersWithActiveDevices() {
+            return rows.values().stream().filter(DeviceToken::active).map(DeviceToken::userId).distinct().toList();
+        }
+
+        @Override
         public void deactivate(String token) {
             findByToken(token).ifPresent(d -> {
                 d.deactivate();
