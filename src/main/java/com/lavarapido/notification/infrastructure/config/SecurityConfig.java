@@ -1,9 +1,11 @@
 package com.lavarapido.notification.infrastructure.config;
 
 import com.lavarapido.notification.infrastructure.adapter.out.push.PushProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -13,6 +15,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -23,6 +26,7 @@ import java.util.List;
  * API sin estado protegida con JWT Bearer (ADR-006). CSRF apagada porque ninguna cookie lleva
  * credenciales. Todo /api/v1 exige sesión; /api/v1/admin/** además el rol ADMIN.
  * Swagger (solo perfil dev) y /actuator/health quedan abiertos.
+ * /internal/** es solo para otros servicios y scripts del servidor: la llave X-Internal-Key.
  */
 @Configuration
 @EnableWebSecurity
@@ -38,7 +42,28 @@ class SecurityConfig {
             "/swagger-ui/**"
     };
 
+    /** Rutas entre servicios (/internal/**): sin JWT, con la llave compartida INTERNAL_API_KEY. */
     @Bean
+    @Order(1)
+    SecurityFilterChain internalFilterChain(HttpSecurity http, ProblemDetailsSecurityHandler entryPoint,
+                                            @Value("${app.internal.api-key:}") String internalApiKey) throws Exception {
+        http
+                .securityMatcher("/internal/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(new InternalApiKeyFilter(internalApiKey), AuthorizationFilter.class)
+                .authorizeHttpRequests(auth -> auth.anyRequest().hasRole("INTERNAL"))
+                .exceptionHandling(errors -> errors
+                        .authenticationEntryPoint(entryPoint)
+                        .accessDeniedHandler(entryPoint));
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain filterChain(HttpSecurity http, ProblemDetailsSecurityHandler entryPoint,
                                     JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
         http
