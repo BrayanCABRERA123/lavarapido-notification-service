@@ -1,6 +1,8 @@
 package com.lavarapido.notification.application.usecase;
 
-import com.lavarapido.notification.domain.model.DeviceToken;
+import com.lavarapido.notification.application.delivery.DeliveryCommand;
+import com.lavarapido.notification.application.delivery.DeliveryInvoker;
+import com.lavarapido.notification.application.delivery.DeliveryInvoker.DeliveryReport;
 import com.lavarapido.notification.domain.model.Notification;
 import com.lavarapido.notification.domain.port.in.SendNotificationCommand;
 import com.lavarapido.notification.domain.port.in.SendNotificationUseCase;
@@ -21,12 +23,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Guarda la notificación en la bandeja, la manda por push a los celulares del usuario y, si el
- * comando trae correo, también por email. Push y correo son extras: si fallan o no aplican, la
- * notificación igual queda guardada y la ve en la campanita.
+ * Guarda la notificación en la bandeja y la entrega por los canales externos (push a los
+ * celulares del usuario y, si el comando trae correo, email). Push y correo son extras: si fallan
+ * o no aplican, la notificación igual queda guardada y la ve en la campanita.
  *
- * El push respeta los interruptores del usuario (NotificationChannels): solo se consultan a
- * security-service si tiene celulares registrados, y si no responde se envía igual.
+ * Las entregas siguen el patrón Command: DeliveryPlanner arma un comando por canal (respetando
+ * los interruptores del usuario) y DeliveryInvoker los ejecuta aislando los fallos.
  */
 @Service
 public class NotificationSendingService implements SendNotificationUseCase {
@@ -34,10 +36,9 @@ public class NotificationSendingService implements SendNotificationUseCase {
     private static final Logger log = LoggerFactory.getLogger(NotificationSendingService.class);
 
     private final NotificationRepository notifications;
-    private final DeviceTokenRepository devices;
-    private final PushSender pushSender;
-    private final EmailSender emailSender;
     private final UserContactDirectory contacts;
+    private final DeliveryPlanner planner;
+    private final DeliveryInvoker invoker = new DeliveryInvoker();
     private final Clock clock;
     private final NotificationTexts texts = NotificationTexts.defaults();
 
@@ -45,10 +46,8 @@ public class NotificationSendingService implements SendNotificationUseCase {
                                       PushSender pushSender, EmailSender emailSender,
                                       UserContactDirectory contacts, Clock clock) {
         this.notifications = notifications;
-        this.devices = devices;
-        this.pushSender = pushSender;
-        this.emailSender = emailSender;
         this.contacts = contacts;
+        this.planner = new DeliveryPlanner(devices, pushSender, emailSender);
         this.clock = clock;
     }
 
@@ -65,17 +64,12 @@ public class NotificationSendingService implements SendNotificationUseCase {
                 localized.title(), localized.message(), localized.referenceEntity(), localized.referenceId(),
                 clock.instant()));
 
-        List<DeviceToken> targets = devices.findActiveByUser(saved.userId());
-        if (!targets.isEmpty() && wantsPush(saved, contactRead ? contact : contacts.contactOf(saved.userId()))) {
-            pushSender.send(saved, targets);
-        } else {
-            targets = List.of();
-        }
-        if (localized.hasEmail()) {
-            emailSender.send(saved, localized.email().strip(), localized.recipientName(), language);
-        }
-        log.info("Notification {} ({}) created for user {}, push to {} device(s)",
-                saved.notificationId(), saved.type(), saved.userId(), targets.size());
+        List<DeliveryCommand> deliveries = planner.plan(saved, localized, language,
+                () -> contactRead ? contact : contacts.contactOf(saved.userId()));
+        DeliveryReport report = invoker.run(saved.notificationId(), deliveries);
+        log.info("Notification {} ({}) created for user {}, delivered by {}{}", saved.notificationId(),
+                saved.type(), saved.userId(), report.delivered().isEmpty() ? "inbox only" : report.delivered(),
+                report.failed().isEmpty() ? "" : ", failed by " + report.failed());
         return saved;
     }
 
@@ -83,10 +77,5 @@ public class NotificationSendingService implements SendNotificationUseCase {
     @Transactional
     public List<Notification> sendAll(List<SendNotificationCommand> commands) {
         return commands.stream().map(this::send).toList();
-    }
-
-    // sin respuesta de security-service se envía: es mejor avisar de más que dejar de avisar
-    private boolean wantsPush(Notification notification, Optional<UserContact> contact) {
-        return contact.map(c -> NotificationChannels.wantsPush(c, notification.type())).orElse(true);
     }
 }
