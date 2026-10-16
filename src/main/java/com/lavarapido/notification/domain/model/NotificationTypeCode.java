@@ -39,7 +39,9 @@ public enum NotificationTypeCode {
     ADMIN_BOOKING_RESCHEDULED(NotificationCategory.MESSAGE),
     ADMIN_BOOKING_CANCELLED(NotificationCategory.CANCELLATION),
     // reserva confirmada que empieza en menos de 2 horas y sigue sin operario (migración 031)
-    ADMIN_BOOKING_UNASSIGNED(NotificationCategory.MESSAGE);
+    ADMIN_BOOKING_UNASSIGNED(NotificationCategory.MESSAGE),
+    // hay un APK nuevo de la app publicado en el servidor (migración 038)
+    APP_UPDATE_AVAILABLE(NotificationCategory.SYSTEM);
 
     private final NotificationCategory category;
 

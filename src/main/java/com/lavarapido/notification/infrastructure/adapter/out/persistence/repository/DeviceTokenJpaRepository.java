@@ -15,6 +15,9 @@ public interface DeviceTokenJpaRepository extends JpaRepository<DeviceTokenJpaEn
 
     List<DeviceTokenJpaEntity> findByUserIdAndActiveTrue(long userId);
 
+    @Query("SELECT DISTINCT d.userId FROM DeviceTokenJpaEntity d WHERE d.active = true")
+    List<Long> findUserIdsWithActiveDevices();
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE DeviceTokenJpaEntity d SET d.active = false WHERE d.token = :token")
     int deactivateByToken(@Param("token") String token);
