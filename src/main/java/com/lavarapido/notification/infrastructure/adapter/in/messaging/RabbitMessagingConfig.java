@@ -42,6 +42,8 @@ class RabbitMessagingConfig {
             "execution.operator_assigned",
             "execution.service_started",
             "execution.service_completed",
+            "execution.service_not_started",
+            "execution.service_not_finished",
             "execution.inspection_shared",
             "payment.confirmed",
             "payment.rejected",

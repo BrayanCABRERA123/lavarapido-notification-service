@@ -211,4 +211,21 @@ class StaffNotificationsTest {
         assertEquals(0, created);
         assertTrue(tracking.rows.containsKey(145L));
     }
+
+    @Test
+    @DisplayName("un servicio que terminó sin registrarse avisa al operario y al administrador, nunca al cliente")
+    void aServiceNobodyRegisteredNotifiesTheStaff() {
+        event("ServiceNotStarted", Map.of("operatorUserId", JUAN));
+
+        Notification operatorNotice = only(JUAN, NotificationTypeCode.OPERATOR_SERVICE_NOT_REGISTERED);
+        assertTrue(operatorNotice.message().contains("RES-000145"), operatorNotice.message());
+        assertTrue(operatorNotice.message().contains("10/10/2026 a las 09:00"), operatorNotice.message());
+        Notification adminNotice = only(ADMIN, NotificationTypeCode.ADMIN_SERVICE_NOT_REGISTERED);
+        assertTrue(adminNotice.message().contains("No asistió"), adminNotice.message());
+        assertEquals(List.of(), typesOf(CLIENT));
+        assertEquals(List.of(), email.sentTo);
+
+        event("ServiceNotFinished", Map.of("operatorUserId", JUAN));
+        assertEquals(2L, countsOf(JUAN).get(NotificationTypeCode.OPERATOR_SERVICE_NOT_REGISTERED));
+    }
 }

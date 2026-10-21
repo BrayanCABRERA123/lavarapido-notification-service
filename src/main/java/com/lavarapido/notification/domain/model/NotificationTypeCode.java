@@ -41,7 +41,10 @@ public enum NotificationTypeCode {
     // reserva confirmada que empieza en menos de 2 horas y sigue sin operario (migración 031)
     ADMIN_BOOKING_UNASSIGNED(NotificationCategory.MESSAGE),
     // hay un APK nuevo de la app publicado en el servidor (migración 038)
-    APP_UPDATE_AVAILABLE(NotificationCategory.SYSTEM);
+    APP_UPDATE_AVAILABLE(NotificationCategory.SYSTEM),
+    // el servicio terminó y nadie lo registró (no se inició o no se finalizó), migración 041
+    OPERATOR_SERVICE_NOT_REGISTERED(NotificationCategory.MESSAGE),
+    ADMIN_SERVICE_NOT_REGISTERED(NotificationCategory.MESSAGE);
 
     private final NotificationCategory category;
 
