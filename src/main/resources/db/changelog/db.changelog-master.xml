@@ -30,5 +30,6 @@
     <include file="db/changelog/029-notification-loyalty-and-inspection-types.sql"/>
     <include file="db/changelog/031-notification-unassigned-booking-alert.sql"/>
     <include file="db/changelog/038-notification-app-update-type.sql"/>
+    <include file="db/changelog/041-notification-service-not-registered-types.sql"/>
 
 </databaseChangeLog>

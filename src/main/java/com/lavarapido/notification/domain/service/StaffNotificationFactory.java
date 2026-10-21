@@ -20,6 +20,8 @@ import java.util.Optional;
  *   <li>Operario: su servicio se cancela, cambia de hora o se le asigna a otro operario.</li>
  *   <li>Administrador: reserva nueva, reprogramada o cancelada (con el motivo). El evento no dice
  *       quién canceló, así que también le llega la que cancela otro administrador.</li>
+ *   <li>Los dos: el servicio terminó y nadie lo registró (operations-service lo avisa una vez). El
+ *       operario puede registrarlo tarde; el administrador lo cierra desde "Por cerrar".</li>
  * </ul>
  *
  * Usa lo último que se supo de la reserva ({@link TrackedBooking}) para distinguir una reserva
@@ -32,6 +34,8 @@ public final class StaffNotificationFactory {
     private static final String BOOKING_CONFIRMED = "BookingConfirmed";
     private static final String BOOKING_CANCELLED = "BookingCancelled";
     private static final String OPERATOR_ASSIGNED = "OperatorAssigned";
+    private static final String SERVICE_NOT_STARTED = "ServiceNotStarted";
+    private static final String SERVICE_NOT_FINISHED = "ServiceNotFinished";
 
     /** Avisos que genera el evento, comparándolo con lo que ya se sabía de la reserva. */
     public List<SendNotificationCommand> from(DomainEventEnvelope event, Optional<TrackedBooking> previous,
@@ -84,6 +88,14 @@ public final class StaffNotificationFactory {
                                         booking.scheduledStart() != null ? booking.scheduledStart()
                                                 : previous.get().scheduledStart())),
                                 bookingId));
+            }
+            case SERVICE_NOT_STARTED, SERVICE_NOT_FINISHED -> {
+                String key = SERVICE_NOT_STARTED.equals(event.eventType()) ? "notStarted" : "notFinished";
+                LocalizedText params = params(code).with("when", EventNotificationFactory.when(booking.scheduledStart()));
+                add(commands, id(event.payload(), "operatorUserId"), NotificationTypeCode.OPERATOR_SERVICE_NOT_REGISTERED,
+                        "operator." + key, params, bookingId);
+                forEach(commands, adminIds, NotificationTypeCode.ADMIN_SERVICE_NOT_REGISTERED, "admin." + key, params,
+                        bookingId);
             }
             default -> {
                 // los demás eventos no le avisan nada al personal
