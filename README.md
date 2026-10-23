@@ -61,7 +61,7 @@ Los errores salen en RFC 9457 con `code` (ej. `NOTIFICATION_NOT_FOUND`, `INVALID
 Exchange `carwash.events`, cola `notification-service.events` (DLQ: `notification-service.events.dlq`).
 El publicador debe mandar el `user_id` de quien recibe la notificación (tabla completa en ADR-011):
 
-`security.user_registered` · `booking.created` · `booking.confirmed` · `booking.cancelled` ·
+`security.user_registered` · `booking.created` · `booking.confirmed` · `booking.cancelled` · `booking.status_changed` (A-11: en curso, completada o no asistió por el administrador) ·
 `execution.operator_assigned` · `execution.service_started` · `execution.service_completed` ·
 `payment.confirmed` · `payment.rejected` · `payment.refunded` · `payment.promotion_redeemed` ·
 `payment.loyalty_points_earned`

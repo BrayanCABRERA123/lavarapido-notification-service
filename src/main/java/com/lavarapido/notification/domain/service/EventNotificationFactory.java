@@ -68,6 +68,20 @@ public final class EventNotificationFactory {
             }
             case "BookingCancelled" -> add(commands, userId(p, "customerUserId"), NotificationTypeCode.BOOKING_CANCELLED,
                     "booking.cancelled", booking(p).with("reason", reason(p)), BOOKING, bookingId);
+            // A-11: el administrador cambió el estado de la reserva desde su panel
+            case "BookingStatusChanged" -> {
+                String status = text(p, "status");
+                if ("IN_PROGRESS".equals(status)) {
+                    add(commands, userId(p, "customerUserId"), NotificationTypeCode.SERVICE_STARTED,
+                            "service.started", booking(p), BOOKING, bookingId);
+                } else if ("COMPLETED".equals(status)) {
+                    add(commands, userId(p, "customerUserId"), NotificationTypeCode.SERVICE_COMPLETED,
+                            "service.completed", booking(p), BOOKING, bookingId);
+                } else if ("NO_SHOW".equals(status)) {
+                    add(commands, userId(p, "customerUserId"), NotificationTypeCode.BOOKING_CANCELLED,
+                            "booking.noShow", booking(p), BOOKING, bookingId);
+                }
+            }
             case "OperatorAssigned" -> {
                 add(commands, userId(p, "operatorUserId"), NotificationTypeCode.OPERATOR_ASSIGNED,
                         "operator.assigned", booking(p), BOOKING, bookingId);
