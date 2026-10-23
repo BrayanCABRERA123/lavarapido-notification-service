@@ -1,4 +1,9 @@
 spring:
+  # respuestas de error sin mensajes internos ni trazas (en Spring Boot 4 reemplaza a server.error.*)
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
   application:
     name: notification-service
   # En local arranca con dev, salvo que se diga otra cosa con SPRING_PROFILES_ACTIVE.
@@ -50,12 +55,27 @@ spring:
           initial-interval: 1s
           multiplier: 2
 
+  # SMTP (mismas variables MAIL_* del security-service). Solo se usa si MAIL_ENABLED=true.
+  # Gmail: smtp.gmail.com:587 + contraseña de aplicación. Mailpit (dev): localhost:1025.
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_STARTTLS:true}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
 server:
   port: ${PORT:3006}
   shutdown: graceful
-  error:
-    include-message: never
-    include-stacktrace: never
 
 security:
   jwt:
@@ -67,8 +87,14 @@ security:
     access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:1h}
 
 app:
+  # dirección de la web: el aviso del informe de inspección lleva el enlace público (/report/{token})
+  web-url: ${WEB_URL:http://localhost:4200}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:8081}
+  mail:
+    # false: el correo solo se anota en el log. true: se envía (hoy solo la bienvenida)
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:LavaRápido <no-reply@lavarapido.local>}
   messaging:
     # false: el servicio funciona sin RabbitMQ (solo bandeja + mensajes del admin)
     enabled: ${MESSAGING_ENABLED:false}
@@ -79,6 +105,25 @@ app:
     # opcional: solo si en expo.dev se activa "Enhanced security for push"
     access-token: ${EXPO_ACCESS_TOKEN:}
     timeout: 10s
+  security-service:
+    # de aquí se pide el correo del usuario para los avisos de reserva y recordatorios
+    base-url: ${SECURITY_SERVICE_URL:http://localhost:3001}
+    timeout: 3s
+  internal:
+    # llave compartida con security-service para /internal/** (X-Internal-Key).
+    # Vacía: los avisos de reserva y recordatorios no van por correo (sí a la bandeja y push)
+    api-key: ${INTERNAL_API_KEY:}
+  reminders:
+    # recordatorios de reserva (bandeja, push y correo). false: se programan pero no se envían
+    enabled: ${REMINDERS_ENABLED:true}
+    # con cuánta anticipación se avisa, antes de la hora de la reserva
+    leads: ${REMINDER_LEADS:24h,1h}
+    # cada cuánto se revisan los recordatorios vencidos
+    check-interval: ${REMINDER_CHECK_INTERVAL:5m}
+    # aviso a los administradores: reserva que empieza en menos de esto y sigue sin operario
+    unassigned-lead: ${REMINDER_UNASSIGNED_LEAD:2h}
+    initial-delay: 30s
+    batch-size: 100
 
 springdoc:
   api-docs:
@@ -99,6 +144,9 @@ management:
     # sin RabbitMQ encendido el servicio sigue sano; con mensajería activa sí se revisa
     rabbit:
       enabled: ${MESSAGING_ENABLED:false}
+    # un SMTP caído no debe marcar el servicio como caído: el correo es secundario
+    mail:
+      enabled: false
   info:
     env:
       enabled: true

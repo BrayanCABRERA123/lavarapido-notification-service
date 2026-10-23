@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClientException;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -98,20 +99,29 @@ class ExpoPushSender implements PushSender {
                 notification.notificationId(), ok, batch.size());
     }
 
-    /** Mensaje de la API de Expo. data viaja oculto: la app lo usa para abrir la pantalla correcta. */
-    record ExpoMessage(String to, String title, String body, String sound, String channelId,
+    /**
+     * Mensaje de la API de Expo. data viaja oculto: la app lo usa para abrir la pantalla correcta
+     * y marcar la notificación como leída.
+     *
+     * channelId es la categoría en minúsculas (reminder, promotion, confirmation...): la app crea
+     * un canal de Android por categoría, así el usuario puede silenciar solo las promociones desde
+     * los ajustes del celular. priority high la muestra como aviso emergente en Android.
+     */
+    record ExpoMessage(String to, String title, String body, String sound, String channelId, String priority,
                        Map<String, Object> data) {
 
         static ExpoMessage of(Notification notification, DeviceToken device) {
+            String category = notification.type().category().name();
             Map<String, Object> data = new HashMap<>();
             data.put("notificationId", notification.notificationId());
             data.put("type", notification.type().name());
+            data.put("category", category);
             if (notification.referenceEntity() != null) {
                 data.put("referenceEntity", notification.referenceEntity());
                 data.put("referenceId", notification.referenceId());
             }
             return new ExpoMessage(device.token(), notification.title(), notification.message(), "default",
-                    "default", data);
+                    category.toLowerCase(Locale.ROOT), "high", data);
         }
     }
 

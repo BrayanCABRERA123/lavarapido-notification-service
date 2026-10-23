@@ -19,9 +19,32 @@ public enum NotificationTypeCode {
     SERVICE_COMPLETED(NotificationCategory.CONFIRMATION),
     PAYMENT_CONFIRMED(NotificationCategory.CONFIRMATION),
     PAYMENT_REJECTED(NotificationCategory.CANCELLATION),
+    // el admin devolvió un pago aprobado (payment.refunded, migración 028)
+    PAYMENT_REFUNDED(NotificationCategory.MESSAGE),
+    // con los puntos ganados el cliente desbloqueó un cupón (payment.loyalty_points_earned)
     PROMOTION_AVAILABLE(NotificationCategory.PROMOTION),
+    // puntos de fidelización que ganó una reserva pagada (migración 029)
+    LOYALTY_POINTS_EARNED(NotificationCategory.PROMOTION),
+    // el admin le avisa al cliente que terminó la inspección de su vehículo (migración 029)
+    INSPECTION_REPORT(NotificationCategory.MESSAGE),
+    // confirmación de canje de un cupón en el pago (payment.promotion_redeemed, migración 025)
+    PROMOTION_REDEEMED(NotificationCategory.CONFIRMATION),
     // mensaje que escribe el administrador (y la forma de probar el servicio sin los demás)
-    SYSTEM_MESSAGE(NotificationCategory.SYSTEM);
+    SYSTEM_MESSAGE(NotificationCategory.SYSTEM),
+    // avisos para el personal (migración 027): solo bandeja y push, nunca correo
+    OPERATOR_SERVICE_CANCELLED(NotificationCategory.CANCELLATION),
+    OPERATOR_SERVICE_RESCHEDULED(NotificationCategory.MESSAGE),
+    OPERATOR_SERVICE_UNASSIGNED(NotificationCategory.CANCELLATION),
+    ADMIN_BOOKING_CREATED(NotificationCategory.CONFIRMATION),
+    ADMIN_BOOKING_RESCHEDULED(NotificationCategory.MESSAGE),
+    ADMIN_BOOKING_CANCELLED(NotificationCategory.CANCELLATION),
+    // reserva confirmada que empieza en menos de 2 horas y sigue sin operario (migración 031)
+    ADMIN_BOOKING_UNASSIGNED(NotificationCategory.MESSAGE),
+    // hay un APK nuevo de la app publicado en el servidor (migración 038)
+    APP_UPDATE_AVAILABLE(NotificationCategory.SYSTEM),
+    // el servicio terminó y nadie lo registró (no se inició o no se finalizó), migración 041
+    OPERATOR_SERVICE_NOT_REGISTERED(NotificationCategory.MESSAGE),
+    ADMIN_SERVICE_NOT_REGISTERED(NotificationCategory.MESSAGE);
 
     private final NotificationCategory category;
 

@@ -13,6 +13,9 @@ public interface DeviceTokenRepository {
 
     List<DeviceToken> findActiveByUser(long userId);
 
+    /** Usuarios con al menos un celular activo: los que tienen la app instalada. */
+    List<Long> usersWithActiveDevices();
+
     /** Expo avisó que la app ya no está instalada en ese celular. */
     void deactivate(String token);
 }

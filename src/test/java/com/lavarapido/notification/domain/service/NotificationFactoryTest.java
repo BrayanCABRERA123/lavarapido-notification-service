@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,6 +34,20 @@ class NotificationFactoryTest {
         assertEquals(12, commands.getFirst().userId());
         assertEquals(NotificationTypeCode.USER_WELCOME, commands.getFirst().type());
         assertNull(commands.getFirst().referenceEntity());
+    }
+
+    @Test
+    @DisplayName("la bienvenida lleva el correo y el nombre del evento; un correo inválido se descarta")
+    void welcomeCarriesEmail() {
+        SendNotificationCommand command = factory.from(event("UserRegistered",
+                Map.of("userId", 12, "email", "ana@gmail.com", "firstName", "Ana"))).getFirst();
+        assertEquals("ana@gmail.com", command.email());
+        assertEquals("Ana", command.recipientName());
+        assertTrue(command.hasEmail());
+
+        SendNotificationCommand invalid = factory.from(event("UserRegistered",
+                Map.of("userId", 12, "email", "no es un correo"))).getFirst();
+        assertFalse(invalid.hasEmail());
     }
 
     @Test
@@ -78,6 +93,128 @@ class NotificationFactoryTest {
     }
 
     @Test
+    @DisplayName("quien se registra solo recibe la bienvenida de cliente, sin la nota de la contraseña")
+    void selfRegisteredClientWelcome() {
+        String message = factory.from(event("UserRegistered", Map.of("userId", 12, "roles", List.of("CLIENT"),
+                "createdByAdmin", false))).getFirst().message();
+
+        assertTrue(message.contains("reservar tu primer lavado"), message);
+        assertFalse(message.contains("contraseña"), message);
+    }
+
+    @Test
+    @DisplayName("un operario creado por el admin recibe la bienvenida de operario y cómo entrar")
+    void operatorCreatedByAdminWelcome() {
+        String message = factory.from(event("UserRegistered", Map.of("userId", 12, "roles", List.of("OPERATOR"),
+                "createdByAdmin", true))).getFirst().message();
+
+        assertTrue(message.contains("como operario"), message);
+        assertFalse(message.contains("vehículos"), message);
+        assertTrue(message.contains("Un administrador creó tu cuenta"), message);
+        assertTrue(message.contains("¿Olvidaste tu contraseña?"), message);
+    }
+
+    @Test
+    @DisplayName("si la cuenta tiene varios roles, la bienvenida es la del de más privilegios")
+    void adminWinsOverOtherRoles() {
+        String message = factory.from(event("UserRegistered", Map.of("userId", 12,
+                "roles", List.of("CLIENT", "ADMIN"), "createdByAdmin", true))).getFirst().message();
+
+        assertTrue(message.contains("cuenta de administrador"), message);
+    }
+
+    @Test
+    @DisplayName("un evento viejo sin roles ni createdByAdmin sigue dando la bienvenida de cliente")
+    void oldEventWithoutTheNewFields() {
+        String message = factory.from(event("UserRegistered", Map.of("userId", 12))).getFirst().message();
+
+        assertTrue(message.contains("reservar tu primer lavado"), message);
+        assertFalse(message.contains("contraseña"), message);
+    }
+
+    @Test
+    @DisplayName("PromotionRedeemed confirma el cupón con el nombre, la reserva y el descuento")
+    void confirmsRedeemedCoupon() {
+        // mismo payload que publica payment-service (LoyaltyApplicationService.RedeemAsync)
+        List<SendNotificationCommand> commands = factory.from(event("PromotionRedeemed", Map.of(
+                "customerUserId", 7, "bookingId", 145, "bookingCode", "RES-000145",
+                "promotionCode", "LAVA20", "promotionName", "Lavado 20%", "discountAmount", 12500.0)));
+
+        assertEquals(1, commands.size());
+        SendNotificationCommand command = commands.getFirst();
+        assertEquals(7, command.userId());
+        assertEquals(NotificationTypeCode.PROMOTION_REDEEMED, command.type());
+        assertEquals("booking", command.referenceEntity());
+        assertEquals(145L, command.referenceId());
+        assertEquals("Cupón canjeado: Lavado 20%", command.title());
+        assertTrue(command.message().contains("RES-000145"), command.message());
+        assertTrue(command.message().contains("$12.500"), command.message());
+    }
+
+    @Test
+    @DisplayName("PromotionRedeemed sin nombre ni monto sigue armando un mensaje legible")
+    void redeemedCouponWithoutOptionalData() {
+        SendNotificationCommand command = factory.from(event("PromotionRedeemed",
+                Map.of("customerUserId", 7))).getFirst();
+
+        assertEquals("Cupón canjeado: tu promoción", command.title());
+        assertFalse(command.message().contains("descontamos"), command.message());
+    }
+
+    @Test
+    @DisplayName("LoyaltyPointsEarned avisa los puntos ganados y un cupón canjeable por cada promoción desbloqueada")
+    void pointsEarnedWithUnlockedCoupons() {
+        // mismo payload que publica payment-service (LoyaltyIntegrationEvents)
+        List<SendNotificationCommand> commands = factory.from(event("LoyaltyPointsEarned", Map.of(
+                "customerUserId", 7, "bookingId", 145, "bookingCode", "RES-000145", "points", 25, "balance", 40,
+                "unlockedPromotions", List.of(
+                        Map.of("code", "LAVA20", "name", "Lavado 20%", "discountPercent", 20, "requiredPoints", 30),
+                        Map.of("code", "VIP10", "name", "Cliente VIP", "discountPercent", 10, "requiredPoints", 40)))));
+
+        assertEquals(3, commands.size());
+        SendNotificationCommand points = commands.getFirst();
+        assertEquals(NotificationTypeCode.LOYALTY_POINTS_EARNED, points.type());
+        assertEquals("Ganaste 25 puntos", points.title());
+        assertTrue(points.message().contains("RES-000145"), points.message());
+        assertTrue(points.message().contains("Ahora tienes 40 puntos"), points.message());
+        assertEquals("booking", points.referenceEntity());
+
+        SendNotificationCommand coupon = commands.get(1);
+        assertEquals(NotificationTypeCode.PROMOTION_AVAILABLE, coupon.type());
+        assertEquals(7, coupon.userId());
+        assertEquals("¡Tienes un cupón canjeable!", coupon.title());
+        assertTrue(coupon.message().contains("«Lavado 20%»: 20% de descuento"), coupon.message());
+        assertTrue(coupon.message().contains("Usa el código LAVA20"), coupon.message());
+        assertEquals("VIP10", commands.get(2).message().replaceAll(".*código (\\w+).*", "$1"));
+    }
+
+    @Test
+    @DisplayName("LoyaltyPointsEarned sin cupones desbloqueados solo avisa los puntos; sin puntos no avisa nada")
+    void pointsEarnedWithoutCoupons() {
+        List<SendNotificationCommand> commands = factory.from(event("LoyaltyPointsEarned", Map.of(
+                "customerUserId", 7, "bookingId", 145, "points", 1, "balance", 1, "unlockedPromotions", List.of())));
+
+        assertEquals(1, commands.size());
+        assertEquals("Ganaste 1 punto", commands.getFirst().title());
+        assertTrue(factory.from(event("LoyaltyPointsEarned", Map.of("customerUserId", 7, "points", 0))).isEmpty());
+    }
+
+    @Test
+    @DisplayName("PaymentRefunded avisa al cliente que se le devolvió el pago, con el monto")
+    void refundsPayment() {
+        // mismo payload que publica payment-service (PaymentIntegrationEvents)
+        SendNotificationCommand command = factory.from(event("PaymentRefunded", Map.of(
+                "paymentId", 90, "bookingId", 145, "customerUserId", 7, "amount", 45000))).getFirst();
+
+        assertEquals(7, command.userId());
+        assertEquals(NotificationTypeCode.PAYMENT_REFUNDED, command.type());
+        assertEquals("Pago reembolsado", command.title());
+        assertEquals("payment", command.referenceEntity());
+        assertEquals(90L, command.referenceId());
+        assertTrue(command.message().contains("$45.000"), command.message());
+    }
+
+    @Test
     @DisplayName("sin el user_id del destinatario no se crea notificación")
     void skipsWithoutRecipient() {
         assertTrue(factory.from(event("BookingCreated", Map.of("bookingId", 145))).isEmpty());
@@ -99,5 +236,33 @@ class NotificationFactoryTest {
         assertTrue(factory.from(event("UserAuthenticated", Map.of("userId", 7))).isEmpty());
         assertTrue(factory.from(event("RatingSubmitted", Map.of("customerUserId", 7))).isEmpty());
         assertTrue(factory.from(event(null, Map.of())).isEmpty());
+    }
+
+    @Test
+    void inspectionSharedTellsTheClientWithTheSummaryAndThePublicLink() {
+        EventNotificationFactory withWeb = new EventNotificationFactory("https://lavarapido.co/");
+        var commands = withWeb.from(event("InspectionShared", Map.of(
+                "bookingId", 7, "bookingCode", "RES-000007", "customerUserId", 10002, "plate", "ABC-123",
+                "publicToken", "tok123", "phasesDone", 3, "phasesTotal", 5, "findings", 2, "majorFindings", 1,
+                "areas", List.of("Puerta trasera", "Silla"))));
+
+        assertEquals(1, commands.size());
+        var command = commands.get(0);
+        assertEquals(NotificationTypeCode.INSPECTION_REPORT, command.type());
+        assertEquals(10002L, command.userId());
+        assertTrue(command.message().contains("Fases terminadas: 3 de 5."), command.message());
+        assertTrue(command.message().contains("Hallazgos: 2 (importantes: 1): Puerta trasera, Silla."), command.message());
+        assertTrue(command.message().endsWith("https://lavarapido.co/report/tok123"), command.message());
+    }
+
+    @Test
+    void longInspectionAreasAreShortenedButTheLinkStays() {
+        List<String> areas = java.util.Collections.nCopies(60, "Guardabarros delantero");
+        var command = factory.from(event("InspectionShared", Map.of(
+                "bookingId", 7, "customerUserId", 10002, "publicToken", "tok123", "phasesDone", 5, "phasesTotal", 5,
+                "findings", 60, "majorFindings", 0, "areas", areas))).get(0);
+
+        assertTrue(command.message().length() <= 500, String.valueOf(command.message().length()));
+        assertTrue(command.message().endsWith("/report/tok123"), command.message());
     }
 }

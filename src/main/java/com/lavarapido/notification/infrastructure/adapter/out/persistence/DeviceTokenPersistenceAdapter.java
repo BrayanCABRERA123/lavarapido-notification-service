@@ -40,6 +40,12 @@ class DeviceTokenPersistenceAdapter implements DeviceTokenRepository {
 
     /** Lo llama el envío de push (fuera de la transacción de la petición), por eso abre la suya. */
     @Override
+    @Transactional(readOnly = true)
+    public List<Long> usersWithActiveDevices() {
+        return devices.findUserIdsWithActiveDevices();
+    }
+
+    @Override
     @Transactional
     public void deactivate(String token) {
         devices.deactivateByToken(token);

@@ -1,13 +1,19 @@
 package com.lavarapido.notification.application.fake;
 
+import com.lavarapido.notification.domain.model.BookingReminder;
 import com.lavarapido.notification.domain.model.DeviceToken;
 import com.lavarapido.notification.domain.model.Notification;
 import com.lavarapido.notification.domain.model.NotificationFilter;
 import com.lavarapido.notification.domain.model.PageResult;
+import com.lavarapido.notification.domain.model.TrackedBooking;
+import com.lavarapido.notification.domain.port.out.BookingReminderRepository;
+import com.lavarapido.notification.domain.port.out.BookingTrackingRepository;
 import com.lavarapido.notification.domain.port.out.DeviceTokenRepository;
+import com.lavarapido.notification.domain.port.out.EmailSender;
 import com.lavarapido.notification.domain.port.out.NotificationRepository;
 import com.lavarapido.notification.domain.port.out.ProcessedEventRepository;
 import com.lavarapido.notification.domain.port.out.PushSender;
+import com.lavarapido.notification.domain.port.out.UserContactDirectory;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -118,6 +124,11 @@ public final class Fakes {
         }
 
         @Override
+        public List<Long> usersWithActiveDevices() {
+            return rows.values().stream().filter(DeviceToken::active).map(DeviceToken::userId).distinct().toList();
+        }
+
+        @Override
         public void deactivate(String token) {
             findByToken(token).ifPresent(d -> {
                 d.deactivate();
@@ -145,6 +156,17 @@ public final class Fakes {
         }
     }
 
+    /** Guarda a qué correos se habría enviado cada notificación. */
+    public static final class RecordingEmailSender implements EmailSender {
+
+        public final List<String> sentTo = new ArrayList<>();
+
+        @Override
+        public void send(Notification notification, String toAddress, String recipientName) {
+            sentTo.add(toAddress);
+        }
+    }
+
     /** Guarda qué push se habrían enviado. */
     public static final class RecordingPushSender implements PushSender {
 
@@ -155,6 +177,155 @@ public final class Fakes {
         public void send(Notification notification, List<DeviceToken> targets) {
             sent.add(notification);
             devices += targets.size();
+        }
+    }
+
+    /** Recordatorios en memoria, con la misma regla de la base: una fila por reserva y anticipación. */
+    public static final class InMemoryReminders implements BookingReminderRepository {
+
+        /** fila guardada: el recordatorio y si está cancelado */
+        public static final class Row {
+            public BookingReminder reminder;
+            public boolean cancelled;
+
+            Row(BookingReminder reminder) {
+                this.reminder = reminder;
+            }
+        }
+
+        public final Map<String, Row> rows = new LinkedHashMap<>();
+        private final AtomicLong sequence = new AtomicLong();
+
+        private static String key(long bookingId, int lead) {
+            return bookingId + "/" + lead;
+        }
+
+        @Override
+        public void replaceForBooking(long bookingId, List<BookingReminder> wanted, Instant now) {
+            Set<Integer> leads = new HashSet<>();
+            wanted.forEach(r -> leads.add(r.leadMinutes()));
+            rows.values().stream()
+                    .filter(row -> row.reminder.bookingId() == bookingId && !leads.contains(row.reminder.leadMinutes())
+                            && row.reminder.sentAt() == null)
+                    .forEach(row -> row.cancelled = true);
+            for (BookingReminder r : wanted) {
+                Row existing = rows.get(key(bookingId, r.leadMinutes()));
+                long id = existing == null ? sequence.incrementAndGet() : existing.reminder.id();
+                Row row = new Row(new BookingReminder(id, bookingId, r.userId(), r.bookingCode(), r.scheduledStart(),
+                        r.leadMinutes(), r.remindAt(), null));
+                rows.put(key(bookingId, r.leadMinutes()), row);
+            }
+        }
+
+        @Override
+        public void cancelForBooking(long bookingId, Instant now) {
+            rows.values().stream()
+                    .filter(row -> row.reminder.bookingId() == bookingId && row.reminder.sentAt() == null)
+                    .forEach(row -> row.cancelled = true);
+        }
+
+        @Override
+        public List<BookingReminder> findDue(Instant now, int limit) {
+            return rows.values().stream()
+                    .filter(row -> !row.cancelled && row.reminder.sentAt() == null && !row.reminder.remindAt().isAfter(now))
+                    .map(row -> row.reminder)
+                    .sorted(Comparator.comparing(BookingReminder::remindAt))
+                    .limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public void markSent(long reminderId, Instant sentAt) {
+            rows.values().stream()
+                    .filter(row -> row.reminder.id() == reminderId)
+                    .forEach(row -> {
+                        BookingReminder r = row.reminder;
+                        row.reminder = new BookingReminder(r.id(), r.bookingId(), r.userId(), r.bookingCode(),
+                                r.scheduledStart(), r.leadMinutes(), r.remindAt(), sentAt);
+                    });
+        }
+
+        /** recordatorios pendientes (ni enviados ni cancelados) */
+        public List<BookingReminder> pending() {
+            return rows.values().stream()
+                    .filter(row -> !row.cancelled && row.reminder.sentAt() == null)
+                    .map(row -> row.reminder)
+                    .toList();
+        }
+    }
+
+    /** Contactos de prueba (lo que respondería security-service). */
+    public static final class InMemoryContacts implements UserContactDirectory {
+
+        public final Map<Long, UserContact> contacts = new LinkedHashMap<>();
+        public final List<Long> admins = new ArrayList<>();
+
+        public InMemoryContacts with(long userId, String email, String firstName, boolean active) {
+            contacts.put(userId, new UserContact(userId, email, firstName, active, null, null, null));
+            return this;
+        }
+
+        /** Interruptores de Configuración > Notificaciones (push, correo de recordatorios, promociones). */
+        public InMemoryContacts withChannels(long userId, boolean push, boolean emailReminders, boolean promotions) {
+            UserContact current = contacts.getOrDefault(userId, new UserContact(userId, null, null, true, null, null, null));
+            contacts.put(userId, new UserContact(userId, current.email(), current.firstName(), current.active(), push,
+                    emailReminders, promotions));
+            return this;
+        }
+
+        /** Idioma de la cuenta (es, en, fr, pt): los avisos se escriben en ese idioma. */
+        public InMemoryContacts withLanguage(long userId, String language) {
+            UserContact c = contacts.getOrDefault(userId, new UserContact(userId, null, null, true, null, null, null));
+            contacts.put(userId, new UserContact(userId, c.email(), c.firstName(), c.active(), c.pushEnabled(),
+                    c.emailRemindersEnabled(), c.promotionsEnabled(), language));
+            return this;
+        }
+
+        public InMemoryContacts withAdmins(Long... ids) {
+            admins.addAll(List.of(ids));
+            return this;
+        }
+
+        @Override
+        public Optional<UserContact> contactOf(long userId) {
+            return Optional.ofNullable(contacts.get(userId));
+        }
+
+        @Override
+        public List<Long> activeAdminIds() {
+            return List.copyOf(admins);
+        }
+    }
+
+    public static final class InMemoryBookingTracking implements BookingTrackingRepository {
+
+        public final Map<Long, TrackedBooking> rows = new LinkedHashMap<>();
+
+        @Override
+        public Optional<TrackedBooking> find(long bookingId) {
+            return Optional.ofNullable(rows.get(bookingId));
+        }
+
+        // reservas a las que ya se les avisó que seguían sin operario
+        public final Set<Long> unassignedAlerted = new HashSet<>();
+
+        @Override
+        public void save(TrackedBooking booking) {
+            rows.put(booking.bookingId(), booking);
+            unassignedAlerted.remove(booking.bookingId());
+        }
+
+        @Override
+        public List<TrackedBooking> findUnassignedStartingBetween(Instant from, Instant to) {
+            return rows.values().stream()
+                    .filter(b -> b.operatorUserId() == null && !b.cancelled() && !unassignedAlerted.contains(b.bookingId()))
+                    .filter(b -> b.scheduledStart() != null && !b.scheduledStart().isBefore(from) && !b.scheduledStart().isAfter(to))
+                    .toList();
+        }
+
+        @Override
+        public void markUnassignedAlertSent(long bookingId, Instant at) {
+            unassignedAlerted.add(bookingId);
         }
     }
 }
