@@ -32,6 +32,9 @@ public class DomainEventConsumerService implements ConsumeDomainEventUseCase {
     private static final String BOOKING_CANCELLED = "BookingCancelled";
     // si el servicio ya empezó o terminó, los recordatorios que falten ya no tienen sentido
     private static final Set<String> STOP_REMINDERS = Set.of(BOOKING_CANCELLED, "ServiceStarted", "ServiceCompleted");
+    // A-11: el administrador la movió desde su panel; en curso, completada o no asistió también los quitan
+    private static final String BOOKING_STATUS_CHANGED = "BookingStatusChanged";
+    private static final Set<String> STATUSES_THAT_STOP_REMINDERS = Set.of("IN_PROGRESS", "COMPLETED", "NO_SHOW");
 
     private final ProcessedEventRepository processedEvents;
     private final SendNotificationUseCase sender;
@@ -81,8 +84,13 @@ public class DomainEventConsumerService implements ConsumeDomainEventUseCase {
                     .filter(BookingEventPayload::canBeReminded)
                     .ifPresent(booking -> reminders.schedule(booking.bookingId(), booking.customerUserId(),
                             booking.bookingCode(), booking.scheduledStart()));
-        } else if (STOP_REMINDERS.contains(event.eventType())) {
+        } else if (STOP_REMINDERS.contains(event.eventType()) || statusChangeThatStopsReminders(event)) {
             BookingEventPayload.from(event).ifPresent(booking -> reminders.cancel(booking.bookingId()));
         }
+    }
+
+    private static boolean statusChangeThatStopsReminders(DomainEventEnvelope event) {
+        return BOOKING_STATUS_CHANGED.equals(event.eventType()) && event.payload() != null
+                && STATUSES_THAT_STOP_REMINDERS.contains(String.valueOf(event.payload().get("status")));
     }
 }

@@ -78,7 +78,7 @@ public final class EventNotificationFactory {
                     add(commands, userId(p, "customerUserId"), NotificationTypeCode.SERVICE_COMPLETED,
                             "service.completed", booking(p), BOOKING, bookingId);
                 } else if ("NO_SHOW".equals(status)) {
-                    add(commands, userId(p, "customerUserId"), NotificationTypeCode.BOOKING_CANCELLED,
+                    add(commands, userId(p, "customerUserId"), NotificationTypeCode.BOOKING_NO_SHOW,
                             "booking.noShow", booking(p), BOOKING, bookingId);
                 }
             }

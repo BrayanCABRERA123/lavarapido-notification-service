@@ -13,6 +13,8 @@ public enum NotificationTypeCode {
     BOOKING_CREATED(NotificationCategory.CONFIRMATION),
     BOOKING_CONFIRMED(NotificationCategory.CONFIRMATION),
     BOOKING_CANCELLED(NotificationCategory.CANCELLATION),
+    // A-11: el administrador marcó que el cliente no llegó (no es una cancelación), migración 116
+    BOOKING_NO_SHOW(NotificationCategory.CANCELLATION),
     BOOKING_REMINDER(NotificationCategory.REMINDER),
     OPERATOR_ASSIGNED(NotificationCategory.MESSAGE),
     SERVICE_STARTED(NotificationCategory.MESSAGE),
