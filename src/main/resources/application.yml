@@ -105,6 +105,13 @@ app:
     # opcional: solo si en expo.dev se activa "Enhanced security for push"
     access-token: ${EXPO_ACCESS_TOKEN:}
     timeout: 10s
+  # OPS-05: push y correo salen después del commit desde notification.pending_delivery; si fallan se
+  # reintentan con espera creciente (retry-interval, 2x, 4x... hasta 1 h) hasta max-attempts
+  delivery:
+    max-attempts: ${DELIVERY_MAX_ATTEMPTS:5}
+    retry-interval: ${DELIVERY_RETRY_INTERVAL:1m}
+    check-interval: ${DELIVERY_CHECK_INTERVAL:1m}
+    batch-size: 100
   security-service:
     # de aquí se pide el correo del usuario para los avisos de reserva y recordatorios
     base-url: ${SECURITY_SERVICE_URL:http://localhost:3001}
