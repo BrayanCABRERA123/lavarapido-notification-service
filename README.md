@@ -6,7 +6,8 @@ celular, correo de bienvenida y mensajes del administrador. Recibe los eventos d
 | | |
 |---|---|
 | Puerto | **3006** |
-| Esquema | `notification` (tablas `notification_type`, `notification`, `device_token`, `processed_event`) |
+| Pruebas | `./mvnw test`: 133 al 24-10-2026 (con las ramas de la revisión del 23-10 fusionadas), sin base de datos ni RabbitMQ |
+| Esquema | `notification` (tablas `notification_type`, `notification`, `device_token`, `processed_event`, `booking_reminder`, `booking_tracking`, `pending_delivery`) |
 | Paquete | `com.lavarapido.notification` |
 | Arquitectura | Hexagonal (ADR-007): `domain` sin Spring → `application` → `infrastructure` |
 | Decisiones | ADR-004 (eventos), ADR-009 (dueño del esquema), **ADR-011** (push, tablas nuevas y contrato de eventos) |
@@ -18,7 +19,7 @@ Requisitos: SQL Server del `lavarapido-infra` encendido y el `.env` de esa carpe
 
 ```bash
 ./mvnw spring-boot:run        # Windows: .\mvnw.cmd spring-boot:run
-./mvnw clean test             # pruebas (45)
+./mvnw clean test             # pruebas, sin base de datos
 ```
 
 Swagger (perfil dev): http://localhost:3006/swagger-ui.html — haz login en el security-service
@@ -35,8 +36,12 @@ Swagger (perfil dev): http://localhost:3006/swagger-ui.html — haz login en el 
 | `REMINDERS_ENABLED` | `true` | Envía los recordatorios de reserva a su hora (bandeja + push) |
 | `REMINDER_LEADS` | `24h,1h` | Con cuánta anticipación se recuerda cada reserva |
 | `REMINDER_CHECK_INTERVAL` | `5m` | Cada cuánto se revisan los recordatorios vencidos |
-| `INTERNAL_API_KEY` | vacío | Llave compartida con security-service para pedir el correo del cliente |
+| `INTERNAL_API_KEY` | vacío | Llave compartida con security-service para pedir el correo del cliente y los administradores |
 | `SECURITY_SERVICE_URL` | `http://localhost:3001` | Dónde está security-service |
+| `REMINDER_UNASSIGNED_LEAD` | `2h` | Aviso al admin de reserva confirmada sin operario que empieza pronto |
+| `app.delivery.max-attempts` | `5` | Intentos de cada push o correo antes de abandonarlo (OPS-05) |
+| `app.delivery.retry-interval` | `1m` | Espera del primer reintento; se duplica en cada intento (tope 1 h) |
+| `app.delivery.check-interval` | `1m` | Cada cuánto se revisan las entregas por reintentar |
 
 Con todo en `false` el servicio funciona igual: guarda las notificaciones y se ven en la bandeja.
 
@@ -61,10 +66,24 @@ Los errores salen en RFC 9457 con `code` (ej. `NOTIFICATION_NOT_FOUND`, `INVALID
 Exchange `carwash.events`, cola `notification-service.events` (DLQ: `notification-service.events.dlq`).
 El publicador debe mandar el `user_id` de quien recibe la notificación (tabla completa en ADR-011):
 
-`security.user_registered` · `booking.created` · `booking.confirmed` · `booking.cancelled` ·
-`execution.operator_assigned` · `execution.service_started` · `execution.service_completed` ·
-`payment.confirmed` · `payment.rejected` · `payment.refunded` · `payment.promotion_redeemed` ·
-`payment.loyalty_points_earned`
+`security.user_registered` · `booking.confirmed` · `booking.cancelled` · `booking.status_changed` ·
+`execution.operator_assigned` · `execution.operator_unassigned` · `execution.service_started` ·
+`execution.service_completed` · `execution.service_not_started` · `execution.service_not_finished` ·
+`execution.inspection_shared` · `payment.confirmed` · `payment.rejected` · `payment.refunded` ·
+`payment.promotion_redeemed` · `payment.loyalty_points_earned`
+
+`booking.created` ya no se enlaza: ningún servicio lo publica (la reserva se avisa con
+`booking.confirmed`). Si el broker de un ambiente viejo todavía tiene ese enlace, no estorba.
+
+| Evento | Llaves de texto (`i18n/notifications_*.properties`) | Quién recibe |
+|---|---|---|
+| `BookingStatusChanged` | `service.started`, `service.completed`, `booking.noShow` (tipo `BOOKING_NO_SHOW`, seed 116) | Cliente; en curso, completada o no asistió quitan los recordatorios (A-11) |
+| `ServiceNotStarted` / `ServiceNotFinished` | `operator.notStarted`/`notFinished`, `admin.notStarted`/`notFinished` (tipos `*_SERVICE_NOT_REGISTERED`) | Operario y administradores |
+| `OperatorUnassigned` | `operator.released`, `admin.released` (tipos `OPERATOR_SERVICE_UNASSIGNED` y `ADMIN_BOOKING_UNASSIGNED`) | Operario que la tenía y administradores (E-12) |
+| `InspectionShared` | `inspection.title`, `inspection.message` (tipo `INSPECTION_REPORT`, con el enlace a `WEB_URL/report/{token}`) | Cliente (bandeja, push y correo) |
+
+Si security no responde al pedir los administradores, el evento falla y RabbitMQ lo reintenta (no se
+marca procesado); después de 3 intentos queda en la DLQ (OPS-06). Una lista vacía no es error.
 
 Con `payment.loyalty_points_earned` el cliente recibe "Ganaste N puntos" (solo bandeja) y, por cada
 cupón que esos puntos desbloquearon, "¡Tienes un cupón canjeable!" con el código (bandeja y correo).
@@ -97,6 +116,15 @@ El mismo contacto trae los interruptores de Configuración > Notificaciones y se
 (ADR-011, sección 12): con "Notificaciones push" apagado no hay push; con "Recordatorios por email"
 apagado el recordatorio no va al correo; con "Promociones" apagado el cupón desbloqueado no va ni al
 correo ni por push. La bandeja siempre se llena.
+
+## Entregas por push y correo (OPS-05)
+
+La push y el correo de cada notificación se guardan en `notification.pending_delivery` (migración
+047) en la misma transacción que la notificación y salen **después del commit**, en otro hilo. Si la
+transacción se deshace (el evento falla y se reintenta), no sale nada: no hay push ni correo
+duplicados ni enviados antes de tiempo. Si Expo o el SMTP fallan, una tarea los reintenta con espera
+creciente hasta `app.delivery.max-attempts`; cada entrega se toma con una sola sentencia (claim), así
+no sale dos veces a la vez. La dirección de correo se borra de la fila apenas se entrega o se abandona.
 
 ## Push al celular
 

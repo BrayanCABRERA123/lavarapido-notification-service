@@ -14,8 +14,9 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Objetos del dominio que se inyectan (el dominio no conoce Spring). @EnableAsync: el envío de
- * push corre fuera del hilo de la petición. @EnableScheduling: la tarea de recordatorios.
+ * Objetos del dominio que se inyectan (el dominio no conoce Spring). @EnableAsync: las entregas de
+ * push y correo salen en otro hilo después del commit (OPS-05). @EnableScheduling: las tareas de
+ * recordatorios y de reintento de entregas.
  */
 @Configuration
 @EnableAsync

@@ -29,6 +29,7 @@ public class EmailRecipients {
             NotificationTypeCode.BOOKING_CREATED,
             NotificationTypeCode.BOOKING_CONFIRMED,
             NotificationTypeCode.BOOKING_CANCELLED,
+            NotificationTypeCode.BOOKING_NO_SHOW,
             NotificationTypeCode.BOOKING_REMINDER,
             NotificationTypeCode.PROMOTION_REDEEMED,
             NotificationTypeCode.PAYMENT_CONFIRMED,

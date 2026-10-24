@@ -26,8 +26,9 @@ import java.util.Set;
 public class StaffNotificationService {
 
     private static final Set<String> TRACKED_EVENTS = Set.of("BookingConfirmed", "BookingCancelled", "OperatorAssigned",
+            "OperatorUnassigned",
             "ServiceNotStarted", "ServiceNotFinished");
-    private static final Set<String> ADMIN_EVENTS = Set.of("BookingConfirmed", "BookingCancelled",
+    private static final Set<String> ADMIN_EVENTS = Set.of("BookingConfirmed", "BookingCancelled", "OperatorUnassigned",
             "ServiceNotStarted", "ServiceNotFinished");
 
     private final BookingTrackingRepository tracking;

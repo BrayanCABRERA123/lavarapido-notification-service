@@ -161,6 +161,30 @@ class BookingReminderServiceTest {
     }
 
     @Test
+    @DisplayName("A-11: si el admin la pone en curso, completada o no asistió, los recordatorios se quitan; otro estado no")
+    void statusChangedByTheAdminStopsReminders() {
+        BookingReminderService service = at("2026-09-29T12:00:00Z");
+        DomainEventConsumerService consumer = new DomainEventConsumerService(new InMemoryProcessedEvents(), sender,
+                new EventNotificationFactory(), service, new EmailRecipients(contacts),
+                new StaffNotificationService(new InMemoryBookingTracking(), contacts, new StaffNotificationFactory(), sender));
+        int event = 0;
+        for (String status : List.of("IN_PROGRESS", "COMPLETED", "NO_SHOW")) {
+            consumer.handle(new DomainEventEnvelope("evt-c" + event, "BookingConfirmed", "1", Instant.parse("2026-09-29T12:00:00Z"), 1,
+                    Map.of("bookingId", 1, "bookingCode", "RES-000001", "customerUserId", ANA, "scheduledStart", START)));
+            consumer.handle(new DomainEventEnvelope("evt-s" + event++, "BookingStatusChanged", "1",
+                    Instant.parse("2026-09-29T12:20:00Z"), 1,
+                    Map.of("bookingId", 1, "bookingCode", "RES-000001", "customerUserId", ANA, "status", status)));
+            assertTrue(reminders.pending().isEmpty(), status);
+        }
+
+        consumer.handle(new DomainEventEnvelope("evt-c9", "BookingConfirmed", "1", Instant.parse("2026-09-29T12:00:00Z"), 1,
+                Map.of("bookingId", 1, "bookingCode", "RES-000001", "customerUserId", ANA, "scheduledStart", START)));
+        consumer.handle(new DomainEventEnvelope("evt-s9", "BookingStatusChanged", "1", Instant.parse("2026-09-29T12:20:00Z"), 1,
+                Map.of("bookingId", 1, "bookingCode", "RES-000001", "customerUserId", ANA, "status", "SCHEDULED")));
+        assertEquals(2, reminders.pending().size());
+    }
+
+    @Test
     @DisplayName("un BookingConfirmed sin cliente o sin hora no programa nada (y no falla)")
     void incompleteEventIsIgnored() {
         BookingReminderService service = at("2026-09-29T12:00:00Z");

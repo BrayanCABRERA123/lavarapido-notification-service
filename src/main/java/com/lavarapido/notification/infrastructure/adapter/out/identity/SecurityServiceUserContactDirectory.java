@@ -1,5 +1,6 @@
 package com.lavarapido.notification.infrastructure.adapter.out.identity;
 
+import com.lavarapido.notification.domain.exception.DependencyUnavailableException;
 import com.lavarapido.notification.domain.port.out.UserContactDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +64,12 @@ class SecurityServiceUserContactDirectory implements UserContactDirectory {
         }
     }
 
-    /** GET /internal/v1/users/admins: sin respuesta, los avisos para el administrador no se crean. */
+    /**
+     * GET /internal/v1/users/admins. OPS-06: si security no responde se lanza la excepción, así el
+     * evento no se marca procesado y RabbitMQ lo reintenta (antes se perdían los avisos al admin). Una
+     * lista vacía sí es una respuesta: no hay administradores activos. Sin llave interna tampoco se
+     * reintenta (no se arregla sola): queda la advertencia del arranque y no se avisa a nadie.
+     */
     @Override
     public List<Long> activeAdminIds() {
         if (apiKey.isEmpty()) {
@@ -78,7 +84,8 @@ class SecurityServiceUserContactDirectory implements UserContactDirectory {
             return ids == null ? List.of() : List.of(ids);
         } catch (RestClientException e) {
             log.warn("Could not read the administrators from security-service: {}", e.getMessage());
-            return List.of();
+            throw new DependencyUnavailableException("SECURITY_SERVICE_UNAVAILABLE",
+                    "security-service did not answer the administrators list");
         }
     }
 }

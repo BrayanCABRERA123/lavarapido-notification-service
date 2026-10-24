@@ -76,6 +76,10 @@ public class BookingTrackingJpaEntity {
         return cancelled;
     }
 
+    public Instant getUnassignedAlertAt() {
+        return unassignedAlertAt;
+    }
+
     public void setUnassignedAlertAt(Instant unassignedAlertAt) {
         this.unassignedAlertAt = unassignedAlertAt;
     }
