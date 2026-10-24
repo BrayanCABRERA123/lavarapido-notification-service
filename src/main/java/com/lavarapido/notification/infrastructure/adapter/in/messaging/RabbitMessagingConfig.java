@@ -44,6 +44,7 @@ class RabbitMessagingConfig {
             "booking.cancelled",
             "booking.status_changed",
             "execution.operator_assigned",
+            "execution.operator_unassigned",
             "execution.service_started",
             "execution.service_completed",
             "execution.service_not_started",

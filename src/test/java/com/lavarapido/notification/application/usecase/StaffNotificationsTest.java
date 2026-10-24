@@ -228,4 +228,20 @@ class StaffNotificationsTest {
         event("ServiceNotFinished", Map.of("operatorUserId", JUAN));
         assertEquals(2L, countsOf(JUAN).get(NotificationTypeCode.OPERATOR_SERVICE_NOT_REGISTERED));
     }
+
+    @Test
+    @DisplayName("E-12: si al reprogramar nadie puede atenderla, avisa al operario que la tenía y a los admins")
+    void unassignedAfterRescheduleNotifiesOperatorAndAdmins() {
+        event("BookingConfirmed", Map.of());
+        event("OperatorAssigned", Map.of("operatorUserId", JUAN));
+        event("BookingConfirmed", Map.of("scheduledStart", LATER));
+        event("OperatorUnassigned", Map.of("operatorUserId", JUAN, "scheduledStart", LATER));
+
+        Notification released = only(JUAN, NotificationTypeCode.OPERATOR_SERVICE_UNASSIGNED);
+        assertTrue(released.message().contains("RES-000145"), released.message());
+        Notification alert = only(ADMIN, NotificationTypeCode.ADMIN_BOOKING_UNASSIGNED);
+        assertTrue(alert.message().contains("RES-000145"), alert.message());
+        // la reserva queda sin operario: la alerta de "sin operario" la vuelve a tener en cuenta
+        assertEquals(null, tracking.find(145).orElseThrow().operatorUserId());
+    }
 }
