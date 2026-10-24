@@ -33,10 +33,13 @@ class RabbitMessagingConfig {
     static final String DEAD_LETTER_EXCHANGE = "carwash.events.dlx";
     static final String DEAD_LETTER_QUEUE = "notification-service.events.dlq";
 
-    /** Routing keys de cross-cutting.md §7 que generan notificación. */
+    /**
+     * Routing keys de cross-cutting.md §7 que generan notificación. OPS-10: booking.created ya no se
+     * enlaza porque ningún servicio lo publica (la reserva se avisa con booking.confirmed). Quitarlo de
+     * aquí no borra el enlace de un broker que ya lo tenía; ahí no estorba porque no llega nada.
+     */
     static final List<String> ROUTING_KEYS = List.of(
             "security.user_registered",
-            "booking.created",
             "booking.confirmed",
             "booking.cancelled",
             "booking.status_changed",
