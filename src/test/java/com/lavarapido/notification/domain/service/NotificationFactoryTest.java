@@ -81,7 +81,7 @@ class NotificationFactoryTest {
 
         SendNotificationCommand noShow = factory.from(event("BookingStatusChanged", Map.of(
                 "bookingId", 145, "bookingCode", "RES-8910", "customerUserId", 7, "status", "NO_SHOW"))).getFirst();
-        assertEquals(NotificationTypeCode.BOOKING_CANCELLED, noShow.type());
+        assertEquals(NotificationTypeCode.BOOKING_NO_SHOW, noShow.type());
         assertTrue(noShow.message().contains("RES-8910"), noShow.message());
 
         // un estado que no se avisa no genera nada
