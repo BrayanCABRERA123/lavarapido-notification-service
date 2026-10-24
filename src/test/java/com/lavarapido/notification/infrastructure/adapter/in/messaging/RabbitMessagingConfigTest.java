@@ -41,6 +41,6 @@ class RabbitMessagingConfigTest {
 
         assertFalse(keys.contains("booking.created"));
         assertTrue(keys.containsAll(List.of("booking.confirmed", "booking.status_changed", "execution.service_not_started",
-                "execution.inspection_shared", "payment.confirmed")));
+                "execution.inspection_shared", "execution.operator_unassigned", "payment.confirmed")));
     }
 }

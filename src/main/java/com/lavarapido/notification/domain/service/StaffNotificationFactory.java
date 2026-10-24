@@ -22,6 +22,8 @@ import java.util.Optional;
  *       quién canceló, así que también le llega la que cancela otro administrador.</li>
  *   <li>Los dos: el servicio terminó y nadie lo registró (operations-service lo avisa una vez). El
  *       operario puede registrarlo tarde; el administrador lo cierra desde "Por cerrar".</li>
+ *   <li>Los dos (E-12): al reprogramarla, el operario ya no puede y nadie más está libre; la reserva
+ *       quedó sin operario y el administrador la asigna a mano.</li>
  * </ul>
  *
  * Usa lo último que se supo de la reserva ({@link TrackedBooking}) para distinguir una reserva
@@ -34,6 +36,8 @@ public final class StaffNotificationFactory {
     private static final String BOOKING_CONFIRMED = "BookingConfirmed";
     private static final String BOOKING_CANCELLED = "BookingCancelled";
     private static final String OPERATOR_ASSIGNED = "OperatorAssigned";
+    // E-12: al reprogramar, el operario ya no puede y nadie más está libre: la reserva queda sin operario
+    private static final String OPERATOR_UNASSIGNED = "OperatorUnassigned";
     private static final String SERVICE_NOT_STARTED = "ServiceNotStarted";
     private static final String SERVICE_NOT_FINISHED = "ServiceNotFinished";
 
@@ -89,6 +93,17 @@ public final class StaffNotificationFactory {
                                                 : previous.get().scheduledStart())),
                                 bookingId));
             }
+            case OPERATOR_UNASSIGNED -> {
+                Instant start = booking.scheduledStart() != null ? booking.scheduledStart()
+                        : previous.map(TrackedBooking::scheduledStart).orElse(null);
+                LocalizedText params = params(code).with("when", EventNotificationFactory.when(start));
+                // el operario que la tenía (el evento lo trae; si no, el último conocido)
+                Long released = id(event.payload(), "operatorUserId");
+                add(commands, released != null ? released : previous.map(TrackedBooking::operatorUserId).orElse(null),
+                        NotificationTypeCode.OPERATOR_SERVICE_UNASSIGNED, "operator.released", params, bookingId);
+                forEach(commands, adminIds, NotificationTypeCode.ADMIN_BOOKING_UNASSIGNED, "admin.released", params,
+                        bookingId);
+            }
             case SERVICE_NOT_STARTED, SERVICE_NOT_FINISHED -> {
                 String key = SERVICE_NOT_STARTED.equals(event.eventType()) ? "notStarted" : "notFinished";
                 LocalizedText params = params(code).with("when", EventNotificationFactory.when(booking.scheduledStart()));
@@ -126,6 +141,8 @@ public final class StaffNotificationFactory {
                     .orElseGet(() -> TrackedBooking.confirmed(booking.bookingId(), booking.bookingCode(),
                             booking.customerUserId(), booking.scheduledStart()))
                     .assignedTo(id(event.payload(), "operatorUserId")));
+            // E-12: sin operario; la alerta de "reserva sin operario" la vuelve a tener en cuenta
+            case OPERATOR_UNASSIGNED -> previous.map(p -> p.assignedTo(null));
             default -> Optional.empty();
         };
     }
