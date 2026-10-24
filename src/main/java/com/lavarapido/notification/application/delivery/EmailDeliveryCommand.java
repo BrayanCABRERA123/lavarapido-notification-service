@@ -1,6 +1,7 @@
 package com.lavarapido.notification.application.delivery;
 
 import com.lavarapido.notification.domain.model.Notification;
+import com.lavarapido.notification.domain.model.PendingDelivery;
 import com.lavarapido.notification.domain.port.out.EmailSender;
 
 import java.util.Objects;
@@ -26,6 +27,11 @@ public record EmailDeliveryCommand(Notification notification, String address, St
     @Override
     public void execute() {
         sender.send(notification, address, recipientName, language);
+    }
+
+    @Override
+    public PendingDelivery toPending() {
+        return PendingDelivery.email(notification.notificationId(), address, recipientName, language);
     }
 
     // el correo de la persona no va al log (solo el canal y la notificación)

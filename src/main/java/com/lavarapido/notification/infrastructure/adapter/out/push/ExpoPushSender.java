@@ -10,7 +10,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -22,8 +21,9 @@ import java.util.Map;
 
 /**
  * Envía las push con el servicio de Expo (gratis): Expo las entrega a Firebase (Android) o a
- * Apple (iOS). Corre en otro hilo (@Async): la petición del usuario no espera a Expo, y si Expo
- * falla la notificación igual quedó guardada en la bandeja.
+ * Apple (iOS). OPS-05: corre en el hilo de PendingDeliveryDispatcher, después del commit (la
+ * petición del usuario no espera a Expo). Si Expo no responde, lanza el error y la entrega se
+ * reintenta más tarde; la notificación igual quedó guardada en la bandeja.
  *
  * Si Expo responde DeviceNotRegistered (desinstalaron la app), ese token se desactiva para no
  * seguir enviándole.
@@ -54,7 +54,6 @@ class ExpoPushSender implements PushSender {
         this.client = builder.build();
     }
 
-    @Async
     @Override
     public void send(Notification notification, List<DeviceToken> targets) {
         for (int start = 0; start < targets.size(); start += MAX_BATCH) {
@@ -75,6 +74,8 @@ class ExpoPushSender implements PushSender {
             // el token del celular nunca va al log: basta con el id de la notificación
             log.warn("Push for notification {} could not be sent to Expo: {}",
                     notification.notificationId(), e.getMessage());
+            // OPS-05: Expo no la recibió; PendingDeliveryDispatcher la reintenta más tarde
+            throw e;
         }
     }
 

@@ -2,6 +2,7 @@ package com.lavarapido.notification.application.delivery;
 
 import com.lavarapido.notification.domain.model.DeviceToken;
 import com.lavarapido.notification.domain.model.Notification;
+import com.lavarapido.notification.domain.model.PendingDelivery;
 import com.lavarapido.notification.domain.port.out.PushSender;
 
 import java.util.List;
@@ -28,5 +29,11 @@ public record PushDeliveryCommand(Notification notification, List<DeviceToken> d
     @Override
     public void execute() {
         sender.send(notification, devices);
+    }
+
+    /** Sin los celulares: al enviarla se leen los activos de ese momento. */
+    @Override
+    public PendingDelivery toPending() {
+        return PendingDelivery.push(notification.notificationId());
     }
 }

@@ -32,5 +32,6 @@
     <include file="db/changelog/031-notification-unassigned-booking-alert.sql"/>
     <include file="db/changelog/038-notification-app-update-type.sql"/>
     <include file="db/changelog/041-notification-service-not-registered-types.sql"/>
+    <include file="db/changelog/047-notification-pending-delivery.sql"/>
 
 </databaseChangeLog>
