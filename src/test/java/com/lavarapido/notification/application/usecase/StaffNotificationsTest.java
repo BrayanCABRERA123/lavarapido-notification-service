@@ -98,6 +98,40 @@ class StaffNotificationsTest {
     }
 
     @Test
+    @DisplayName("OPS-06: si security no dice quiénes son los admins, el evento falla y no queda procesado")
+    void securityDownMakesTheEventRetry() {
+        InMemoryProcessedEvents processed = new InMemoryProcessedEvents();
+        com.lavarapido.notification.domain.port.out.UserContactDirectory down =
+                new com.lavarapido.notification.domain.port.out.UserContactDirectory() {
+                    @Override
+                    public java.util.Optional<UserContact> contactOf(long userId) {
+                        return java.util.Optional.empty();
+                    }
+
+                    @Override
+                    public List<Long> activeAdminIds() {
+                        throw new com.lavarapido.notification.domain.exception.DependencyUnavailableException(
+                                "SECURITY_SERVICE_UNAVAILABLE", "down");
+                    }
+                };
+        Clock clock = Clock.fixed(Instant.parse("2026-10-08T12:00:00Z"), ZoneOffset.UTC);
+        NotificationSendingService sender = new NotificationSendingService(notifications, new InMemoryDevices(),
+                new RecordingPushSender(), email, down, clock);
+        DomainEventConsumerService failing = new DomainEventConsumerService(processed, sender,
+                new EventNotificationFactory(), new BookingReminderService(new InMemoryReminders(), sender,
+                new ReminderSettings(List.of(Duration.ofHours(24)), 100), new EmailRecipients(down), clock),
+                new EmailRecipients(down), new StaffNotificationService(tracking, down, new StaffNotificationFactory(), sender));
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.lavarapido.notification.domain.exception.DependencyUnavailableException.class,
+                () -> failing.handle(new DomainEventEnvelope("evt-down", "BookingConfirmed", "145",
+                        Instant.parse("2026-10-08T12:00:00Z"), 1, Map.of("bookingId", 145, "bookingCode", "RES-000145",
+                        "customerUserId", CLIENT, "scheduledStart", START))));
+        // sin marcarlo procesado: el reintento de RabbitMQ lo vuelve a atender completo
+        assertFalse(processed.exists("evt-down"));
+    }
+
+    @Test
     @DisplayName("una reserva nueva le avisa al administrador, con la fecha en hora de Colombia")
     void newBookingNotifiesTheAdmin() {
         event("BookingConfirmed", Map.of());

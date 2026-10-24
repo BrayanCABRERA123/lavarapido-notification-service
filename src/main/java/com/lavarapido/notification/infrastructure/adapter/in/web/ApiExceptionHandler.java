@@ -1,5 +1,6 @@
 package com.lavarapido.notification.infrastructure.adapter.in.web;
 
+import com.lavarapido.notification.domain.exception.DependencyUnavailableException;
 import com.lavarapido.notification.domain.exception.DomainException;
 import com.lavarapido.notification.domain.exception.NotificationNotFoundException;
 import org.slf4j.Logger;
@@ -32,9 +33,12 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(DomainException.class)
     ProblemDetail handleDomain(DomainException exception) {
-        HttpStatus status = exception instanceof NotificationNotFoundException
-                ? HttpStatus.NOT_FOUND
-                : HttpStatus.BAD_REQUEST;
+        HttpStatus status = switch (exception) {
+            case NotificationNotFoundException ignored -> HttpStatus.NOT_FOUND;
+            // OPS-06: otro servicio no respondió
+            case DependencyUnavailableException ignored -> HttpStatus.SERVICE_UNAVAILABLE;
+            default -> HttpStatus.BAD_REQUEST;
+        };
         return problem(status, exception.code(), exception.getMessage());
     }
 

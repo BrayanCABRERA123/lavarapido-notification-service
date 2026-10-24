@@ -13,7 +13,10 @@ public interface UserContactDirectory {
     /** Vacío si no se pudo consultar o si la cuenta no existe: la notificación sigue sin correo. */
     Optional<UserContact> contactOf(long userId);
 
-    /** Ids de los administradores activos. Vacío si no se pudo consultar: no se avisa a nadie. */
+    /**
+     * Ids de los administradores activos (vacío: no hay ninguno). OPS-06: si security no responde lanza
+     * DependencyUnavailableException, para que el evento se reintente en vez de perder el aviso.
+     */
     List<Long> activeAdminIds();
 
     /**
