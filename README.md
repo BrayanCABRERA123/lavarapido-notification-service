@@ -6,7 +6,7 @@ celular, correo de bienvenida y mensajes del administrador. Recibe los eventos d
 | | |
 |---|---|
 | Puerto | **3006** |
-| Pruebas | `./mvnw test`: 114 al 23-10-2026, sin base de datos |
+| Pruebas | `./mvnw test`: 115 al 24-10-2026, sin base de datos |
 | Esquema | `notification` (tablas `notification_type`, `notification`, `device_token`, `processed_event`) |
 | Paquete | `com.lavarapido.notification` |
 | Arquitectura | Hexagonal (ADR-007): `domain` sin Spring → `application` → `infrastructure` |
