@@ -10,10 +10,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.mail.MailPreparationException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.HtmlUtils;
 
@@ -23,10 +24,13 @@ import java.nio.charset.StandardCharsets;
  * Envía la notificación por correo con SMTP (Gmail, Mailpit...), la misma configuración MAIL_*
  * que usa el security-service. Se activa con app.mail.enabled=true.
  *
- * Asíncrono: la reacción al evento no espera al servidor de correo. Si falla, queda en el log
- * (sin el correo del usuario) y la notificación sigue en la bandeja.
+ * OPS-05: corre en el hilo de PendingDeliveryDispatcher, después del commit (la reacción al evento no
+ * espera al servidor de correo). Si falla, queda en el log (sin el correo del usuario), lanza el error
+ * y la entrega se reintenta; la notificación sigue en la bandeja.
  */
 @Component
+// @Primary solo desambigua para el analisis estatico: la pareja con @ConditionalOnProperty opuesta nunca se carga a la vez
+@Primary
 @ConditionalOnProperty(prefix = "app.mail", name = "enabled", havingValue = "true")
 class SmtpEmailSender implements EmailSender {
 
@@ -41,14 +45,12 @@ class SmtpEmailSender implements EmailSender {
         this.from = from;
     }
 
-    @Async
     @Override
     public void send(Notification notification, String toAddress, String recipientName) {
         send(notification, toAddress, recipientName, NotificationTexts.DEFAULT_LANGUAGE);
     }
 
     /** El título y el mensaje ya vienen en el idioma de la cuenta; aquí se escriben el saludo y el pie. */
-    @Async
     @Override
     public void send(Notification notification, String toAddress, String recipientName, String language) {
         try {
@@ -64,6 +66,8 @@ class SmtpEmailSender implements EmailSender {
         } catch (MessagingException | MailException exception) {
             log.error("Could not send the email for notification {}: {}",
                     notification.notificationId(), exception.getMessage());
+            // OPS-05: se reintenta más tarde (PendingDeliveryDispatcher)
+            throw exception instanceof MailException mail ? mail : new MailPreparationException(exception);
         }
     }
 

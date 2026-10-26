@@ -1,5 +1,7 @@
 package com.lavarapido.notification.application.delivery;
 
+import com.lavarapido.notification.domain.model.PendingDelivery;
+
 /**
  * Patrón Command: una entrega de una notificación ya guardada por un canal externo (push o
  * correo). Cada comando lleva todo lo que necesita para ejecutarse, así quien decide qué canales
@@ -15,4 +17,7 @@ public interface DeliveryCommand {
 
     /** Entrega la notificación por este canal. Puede lanzar: el invocador aísla el fallo. */
     void execute();
+
+    /** OPS-05: lo que se guarda para enviarla después del commit y reintentarla si falla. */
+    PendingDelivery toPending();
 }

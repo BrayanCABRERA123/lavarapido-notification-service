@@ -24,6 +24,7 @@
     <include file="db/changelog/017-create-notification-processed-event.sql"/>
     <include file="db/changelog/019-create-notification-booking-reminder.sql"/>
     <include file="db/changelog/seed/108-seed-notification-type.sql"/>
+    <include file="db/changelog/seed/116-seed-notification-booking-no-show-type.sql"/>
     <include file="db/changelog/025-notification-promotion-redeemed-type.sql"/>
     <include file="db/changelog/027-notification-staff-notifications.sql"/>
     <include file="db/changelog/028-notification-payment-refunded-type.sql"/>
@@ -31,5 +32,7 @@
     <include file="db/changelog/031-notification-unassigned-booking-alert.sql"/>
     <include file="db/changelog/038-notification-app-update-type.sql"/>
     <include file="db/changelog/041-notification-service-not-registered-types.sql"/>
+    <include file="db/changelog/047-notification-pending-delivery.sql"/>
+    <include file="db/changelog/048-notification-pending-delivery-nvarchar.sql"/>
 
 </databaseChangeLog>

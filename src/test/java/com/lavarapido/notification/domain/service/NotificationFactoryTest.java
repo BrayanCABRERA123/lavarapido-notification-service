@@ -69,6 +69,27 @@ class NotificationFactoryTest {
     }
 
     @Test
+    @DisplayName("A-11: BookingStatusChanged avisa al cliente según el estado que puso el administrador")
+    void statusChangedByTheAdminNotifiesTheCustomer() {
+        SendNotificationCommand started = factory.from(event("BookingStatusChanged", Map.of(
+                "bookingId", 145, "bookingCode", "RES-8910", "customerUserId", 7, "status", "IN_PROGRESS"))).getFirst();
+        assertEquals(NotificationTypeCode.SERVICE_STARTED, started.type());
+        assertEquals(7, started.userId());
+
+        assertEquals(NotificationTypeCode.SERVICE_COMPLETED, factory.from(event("BookingStatusChanged", Map.of(
+                "bookingId", 145, "customerUserId", 7, "status", "COMPLETED"))).getFirst().type());
+
+        SendNotificationCommand noShow = factory.from(event("BookingStatusChanged", Map.of(
+                "bookingId", 145, "bookingCode", "RES-8910", "customerUserId", 7, "status", "NO_SHOW"))).getFirst();
+        assertEquals(NotificationTypeCode.BOOKING_NO_SHOW, noShow.type());
+        assertTrue(noShow.message().contains("RES-8910"), noShow.message());
+
+        // un estado que no se avisa no genera nada
+        assertTrue(factory.from(event("BookingStatusChanged", Map.of(
+                "bookingId", 145, "customerUserId", 7, "status", "SCHEDULED"))).isEmpty());
+    }
+
+    @Test
     @DisplayName("BookingConfirmed con operario avisa también al operario")
     void confirmsBookingToOperatorToo() {
         List<SendNotificationCommand> commands = factory.from(event("BookingConfirmed", Map.of(

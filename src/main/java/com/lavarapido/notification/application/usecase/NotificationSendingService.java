@@ -1,8 +1,8 @@
 package com.lavarapido.notification.application.usecase;
 
 import com.lavarapido.notification.application.delivery.DeliveryCommand;
-import com.lavarapido.notification.application.delivery.DeliveryInvoker;
-import com.lavarapido.notification.application.delivery.DeliveryInvoker.DeliveryReport;
+import com.lavarapido.notification.application.delivery.DeliveryOutbox;
+import com.lavarapido.notification.application.delivery.ImmediateDeliveryOutbox;
 import com.lavarapido.notification.domain.model.Notification;
 import com.lavarapido.notification.domain.port.in.SendNotificationCommand;
 import com.lavarapido.notification.domain.port.in.SendNotificationUseCase;
@@ -15,6 +15,7 @@ import com.lavarapido.notification.domain.port.out.UserContactDirectory.UserCont
 import com.lavarapido.notification.domain.service.NotificationTexts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +29,9 @@ import java.util.Optional;
  * o no aplican, la notificación igual queda guardada y la ve en la campanita.
  *
  * Las entregas siguen el patrón Command: DeliveryPlanner arma un comando por canal (respetando
- * los interruptores del usuario) y DeliveryInvoker los ejecuta aislando los fallos.
+ * los interruptores del usuario) y el buzón (DeliveryOutbox) los ejecuta. OPS-05: en producción el
+ * buzón los guarda en la misma transacción y los envía después del commit, con reintentos
+ * (PersistentDeliveryOutbox); sin él (pruebas) se ejecutan enseguida.
  */
 @Service
 public class NotificationSendingService implements SendNotificationUseCase {
@@ -38,17 +41,26 @@ public class NotificationSendingService implements SendNotificationUseCase {
     private final NotificationRepository notifications;
     private final UserContactDirectory contacts;
     private final DeliveryPlanner planner;
-    private final DeliveryInvoker invoker = new DeliveryInvoker();
+    private final DeliveryOutbox outbox;
     private final Clock clock;
     private final NotificationTexts texts = NotificationTexts.defaults();
 
+    /** Entregas en el momento, sin guardarlas (pruebas y uso sin base). */
     public NotificationSendingService(NotificationRepository notifications, DeviceTokenRepository devices,
                                       PushSender pushSender, EmailSender emailSender,
                                       UserContactDirectory contacts, Clock clock) {
+        this(notifications, devices, pushSender, emailSender, contacts, clock, new ImmediateDeliveryOutbox());
+    }
+
+    @Autowired
+    public NotificationSendingService(NotificationRepository notifications, DeviceTokenRepository devices,
+                                      PushSender pushSender, EmailSender emailSender,
+                                      UserContactDirectory contacts, Clock clock, DeliveryOutbox outbox) {
         this.notifications = notifications;
         this.contacts = contacts;
         this.planner = new DeliveryPlanner(devices, pushSender, emailSender);
         this.clock = clock;
+        this.outbox = outbox;
     }
 
     @Override
@@ -66,10 +78,9 @@ public class NotificationSendingService implements SendNotificationUseCase {
 
         List<DeliveryCommand> deliveries = planner.plan(saved, localized, language,
                 () -> contactRead ? contact : contacts.contactOf(saved.userId()));
-        DeliveryReport report = invoker.run(saved.notificationId(), deliveries);
-        log.info("Notification {} ({}) created for user {}, delivered by {}{}", saved.notificationId(),
-                saved.type(), saved.userId(), report.delivered().isEmpty() ? "inbox only" : report.delivered(),
-                report.failed().isEmpty() ? "" : ", failed by " + report.failed());
+        outbox.submit(saved, deliveries);
+        log.info("Notification {} ({}) created for user {}, {}", saved.notificationId(), saved.type(), saved.userId(),
+                deliveries.isEmpty() ? "inbox only" : "deliveries by " + deliveries.stream().map(DeliveryCommand::channel).toList());
         return saved;
     }
 
