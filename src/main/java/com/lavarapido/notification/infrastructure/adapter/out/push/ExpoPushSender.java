@@ -7,6 +7,7 @@ import com.lavarapido.notification.domain.port.out.PushSender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -29,6 +30,8 @@ import java.util.Map;
  * seguir enviándole.
  */
 @Component
+// @Primary solo desambigua para el analisis estatico: la pareja con @ConditionalOnProperty opuesta nunca se carga a la vez
+@Primary
 @ConditionalOnProperty(prefix = "app.push", name = "enabled", havingValue = "true")
 class ExpoPushSender implements PushSender {
 

@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -28,6 +29,8 @@ import java.nio.charset.StandardCharsets;
  * y la entrega se reintenta; la notificación sigue en la bandeja.
  */
 @Component
+// @Primary solo desambigua para el analisis estatico: la pareja con @ConditionalOnProperty opuesta nunca se carga a la vez
+@Primary
 @ConditionalOnProperty(prefix = "app.mail", name = "enabled", havingValue = "true")
 class SmtpEmailSender implements EmailSender {
 
